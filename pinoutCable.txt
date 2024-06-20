@@ -1,0 +1,6 @@
+RED		-	GND
+YELLOW	-	P+ 48V
+GREEN	-	Tx/Rx
+BLUE	-	Power Lock
+BLACK	-	Rx/Tx
+

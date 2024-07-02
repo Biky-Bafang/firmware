@@ -60,6 +60,8 @@
 
 # Protocol
 
+Thanks for philippsandhaus for providing some protocol information. [link](https://github.com/philippsandhaus/bafang-python)
+
 ## Command: Read Basic
 
 - Send: 0x11 0x51 0x04 0xB0 0x05
@@ -80,14 +82,16 @@
 - 10-11: 0x32 0x32 (Hardware version ASCII -> 2.2)
 - 12-15: 0x32 0x30 0x31 0x31 (Firmware version ASCII -> 2.0.1.1)
 - 16: Voltage:
+
   | Byte | Voltage |
   | :--- | :------ |
-  | 0x00 | 24V |
-  | 0x01 | 36V |
-  | 0x02 | 48V |
-  | 0x03 | 60V |
-  | 0x04 | 24-48V |
-  | else | 24-60V |
+  | 0x00 | 24V     |
+  | 0x01 | 36V     |
+  | 0x02 | 48V     |
+  | 0x03 | 60V     |
+  | 0x04 | 24-48V  |
+  | else | 24-60V  |
+
 - 17: 0x14 (Max current -> 20A)
   - Integer: The maximum current in A
 - 18: 0x1B (Checksum?)
@@ -129,24 +133,26 @@
 - 22: 0x64 (Limit speed (%) Assist8 -> 100%)
 - 23: 0x64 (Limit speed (%) Assist9 -> 100%)
 - 24: Wheel Diameter (Inch):
-  | Byte | Inch |
-  | :--- | :--- |
-  | 0x1F,0x20 | 16" |
-  | 0x21,0x22 | 17" |
-  | 0x23,0x24 | 18" |
-  | 0x25,0x26 | 19" |
-  | 0x27,0x28 | 20" |
-  | 0x29,0x2A | 21" |
-  | 0x2B,0x2C | 22" |
-  | 0x2D,0x2E | 23" |
-  | 0x2F,0x30 | 24" |
-  | 0x31,0x32 | 25" |
-  | 0x33,0x34 | 26" |
-  | 0x35,0x36 | 27" |
-  | 0x37 | 700C |
-  | 0x38 | 28" |
-  | 0x39,0x3A | 29" |
-  | 0x3B,0x3C | 30" |
+
+  | Byte      | Inch |
+  | :-------- | :--- |
+  | 0x1F,0x20 | 16"  |
+  | 0x21,0x22 | 17"  |
+  | 0x23,0x24 | 18"  |
+  | 0x25,0x26 | 19"  |
+  | 0x27,0x28 | 20"  |
+  | 0x29,0x2A | 21"  |
+  | 0x2B,0x2C | 22"  |
+  | 0x2D,0x2E | 23"  |
+  | 0x2F,0x30 | 24"  |
+  | 0x31,0x32 | 25"  |
+  | 0x33,0x34 | 26"  |
+  | 0x35,0x36 | 27"  |
+  | 0x37      | 700C |
+  | 0x38      | 28"  |
+  | 0x39,0x3A | 29"  |
+  | 0x3B,0x3C | 30"  |
+
 - 25: Speedmeter Model/Speedmeter Signal 01:
   - Bits 1-2 (Model)
   - 0x00: External
@@ -170,37 +176,47 @@
 - 00: 0x53 (Response of the type read)
 - 01: 0x0B (Length of the response)
 - 02: 0x03 (Pedal Type):
-  | Byte | Pedal Type |
-  | :--- | :--------- |
-  | 0x00 | No Pedal |
-  | 0x01 | DH-Sensor-12 |
-  | 0x02 | DH-Sensor-32 |
+
+  | Byte | Pedal Type      |
+  | :--- | :-------------- |
+  | 0x00 | No Pedal        |
+  | 0x01 | DH-Sensor-12    |
+  | 0x02 | DH-Sensor-32    |
   | 0x03 | DoubleSignal-24 |
-- 03: 0xFF (Designated Assist Level)
-  | Byte | Assist Level |
-  | :--- | :----------- |
-  | 0x00-0x09 | Assist Mode Number |
-  | 0xFF | By Display's Command |
-- 04: 0xFF (Speed Limit)
-  | Byte | Speed Limit |
+
+- 03: 0xFF (Designated Assist Level):
+
+  | Byte      | Assist Level         |
+  | :-------- | :------------------- |
+  | 0x00-0x09 | Assist Mode Number   |
+  | 0xFF      | By Display's Command |
+
+- 04: 0xFF (Speed Limit):
+
+  | Byte      | Speed Limit                 |
   | :-------- | :-------------------------- |
   | 0x0F-0x28 | Speed Limit in km/h (15-40) |
-  | 0xFF | By Display's Command |
+  | 0xFF      | By Display's Command        |
+
 - 05: 0x64 (Start Current (%) -> 100%)
   | Byte | Current (%) |
   | :-------- | :---------- |
   | 0x00-0x64 | 0-100% |
-- 06: 0x06 (Slow-Start Mode -> 6)
-  | Byte | Mode Number |
-  | :--- | :---------- |
-  | 0x01-0x08 | 0-8 |
+- 06: 0x06 (Slow-Start Mode -> 6):
+
+  | Byte      | Mode Number |
+  | :-------- | :---------- |
+  | 0x01-0x08 | 0-8         |
+
 - 07: 0x14 (Start Degree -> 20°)
   - Integer: Number of Signal before start
-- 08: 0x0A (Work Mode -> 10)
-  | Byte | Work Mode |
+- 08: 0x0A (Work Mode -> 10):
+
+  | Byte      | Work Mode                             |
   | :-------- | :------------------------------------ |
   | 0x01-0x0A | 1-10 Angular speed of pedal/wheel\*10 |
-  | 0xff | Undetermined |
+  | 0xff      | Undetermined                          |
+
 - 09: 0x19 (Time to stop -> 25)
   - Integer: \*10ms
 - 10: 0x08 (Current Decay -> 8)
@@ -210,6 +226,53 @@
 - 12: 0x14 (Keep current (%) -> 20%)
   - 0x00-0x64
 - 13: 0x27 (Checksum?)
+
+## Command: Read Throttle
+
+- Send: 0x11 0x54
+- Response: 0x54 0x06 0x0B 0x23 0x00 0x03 0x11 0x14 0xAC
+
+### Send (Description)
+
+- 00: 0x11 (Read)
+- 01: 0x54 (Throttle Settings)
+
+### Response (Description)
+
+- 00: 0x54 (Response of the type read)
+- 01: 0x06 (Length of the response)
+- 02: 0x0B (Start voltage (\*100mv) -> 1.1V)
+  - Integer: Voltage in 100mV
+- 03: 0x23 (End voltage (\*100mv) -> 3.5V)
+  - Integer: Voltage in 100mV
+- 04: 0x00 (Mode -> 0):
+
+  | Byte | Mode    |
+  | :--- | :------ |
+  | 0x00 | Current |
+  | 0x01 | Speed   |
+
+- 05: 0x03 (Designated Assist Level):
+
+  | Byte      | Assist Level         |
+  | :-------- | :------------------- |
+  | 0x00-0x09 | Assist Mode Number   |
+  | 0xFF      | By Display's Command |
+
+- 06: 0x11 (Speed Limited (14 - 20))
+
+  | Byte      | Speed Limit                 |
+  | :-------- | :-------------------------- |
+  | 0x0F-0x28 | Speed Limit in km/h (15-40) |
+  | 0xFF      | By Display's Command        |
+
+- 07: 0x14 (Start Current (%) -> 20%)
+
+  | Byte      | Current (%) |
+  | :-------- | :---------- |
+  | 0x00-0x64 | 0-100%      |
+
+- 08: 0xAC (Checksum?)
 
 ## Command: Read Speed
 
@@ -240,10 +303,11 @@
 ### Response (Description)
 
 - 00: 0x01 (Status of the brakes -> Not braking):
+
   | Byte | Description |
   | :--- | :---------- |
   | 0x01 | Not braking |
-  | 0x03 | braking |
+  | 0x03 | braking     |
 
 ## Command: Set Light
 
@@ -255,9 +319,12 @@
 - 00: 0x16 (Write)
 - 01: 0x1a (Length?)
 - 02: 0xf1 (Set light -> On):
-  - 0xf0: Turn off light
-  - 0xf1: Turn on light
+
+  | Byte | Description    |
+  | :--- | :------------- |
+  | 0xf0 | Turn off light |
+  | 0xf1 | Turn on light  |
 
 ### Response (Description)
 
-- 00: 0x20 (OK)
+- 00: 0x20 (OK?)

@@ -13,6 +13,8 @@
 		"initializer_list": "cpp",
 		"regex": "cpp",
 		"typeinfo": "cpp",
-		"new": "cpp"
+		"new": "cpp",
+		"cstddef": "cpp",
+		"functional": "cpp"
 	}
 }

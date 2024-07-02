@@ -1,11 +1,16 @@
 #include <Arduino.h>
 #include "BLEManager.h"
+#include "DebugManager.h"
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#include "esp_log.h"
 
+#define RX0 13
+#define TX0 12
 #define RX1 17
 #define TX1 18
 #define RX2 16
@@ -15,6 +20,7 @@
 #define password "!10057704a"
 
 BLEManager bleManager;
+DebugManager debugManager;
 JsonDocument simpleDoc;
 JsonArray dataCache = simpleDoc.to<JsonArray>();
 JsonDocument settings;
@@ -124,6 +130,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 					bleManager.sendData(responseDoc);
 					break;
 				}
+				vTaskDelay(1);
 			}
 		}
 	}
@@ -269,6 +276,7 @@ void otaTask(void *parameter)
 void setup()
 {
 	Serial.begin(115200);
+	Serial0.begin(115200, SERIAL_8N1, RX0, TX0);
 	Serial1.begin(1200, SERIAL_8N1, RX1, TX1);
 	Serial2.begin(1200, SERIAL_8N1, RX2, TX2);
 	EEPROM.begin(512);
@@ -293,9 +301,15 @@ void setup()
 		Serial.print(".");
 	}
 	Serial.println("Connected to WiFi");
-	// print the IP address
 	Serial.println(WiFi.localIP());
 
+	// print out all the settings as name: value
+	for (JsonPair kv : settings.as<JsonObject>())
+	{
+		// send it to jtag
+		esp_log_level_set("*", ESP_LOG_VERBOSE);
+		ESP_LOGW("Settings", "%s: %s", kv.key().c_str(), kv.value().as<String>().c_str());
+	}
 	ArduinoOTA.setHostname(settings["name"].as<String>().c_str());
 	ArduinoOTA.begin();
 

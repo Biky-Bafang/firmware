@@ -6,15 +6,24 @@
 #include <StreamUtils.h>
 #include <ArduinoOTA.h>
 #include <WiFi.h>
+#include <SD_MMC.h>
 #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "esp_log.h"
+#define REASSIGN_PINS
 
-#define RX0 13
-#define TX0 12
-#define RX1 17
-#define TX1 18
-#define RX2 16
-#define TX2 15
+#define cRX1 9
+#define cTX1 10
+#define cRX2 12
+#define cTX2 11
+
+#define CLK 4
+#define CMD 6
+#define DATA0 5
+#define CD 7
+// #define CLK 4
+// #define CMD 5
+// #define DATA0 6
+// #define CD 8
 
 #define ssid "decop7"
 #define password "!10057704a"
@@ -57,11 +66,15 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 			value.erase(0, 1);
 			if (value[0] == 0x01)
 			{
-				bleManager.sendData(settings);
+				String tempvalue;
+				serializeJson(settings, tempvalue);
+				dataCache.add(tempvalue);
+				return;
 			}
 			if (value[0] == 0x02)
 			{
 				ESP.restart();
+				return;
 			}
 			if (value[0] == 0x03)
 			{
@@ -69,6 +82,16 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 				EepromStream eepromStream(0, 512);
 				serializeJson(settings, eepromStream);
 				EEPROM.commit();
+				return;
+			}
+			if (value[0] == 0x04)
+			{
+				JsonDocument responseDoc;
+				deserializeJson(responseDoc, "{\"sd\":[],\"core\":[{\"id\":\"Core-0\",\"icon\":\"faBluetoothB\",\"label\":\"Start\",\"nodes\":5,\"triggers\":1}]}");
+				String tempvalue;
+				serializeJson(responseDoc, tempvalue);
+				dataCache.add(tempvalue);
+				return;
 			}
 		}
 		else if (value[0] == 0xf2)
@@ -89,6 +112,16 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 			if (value[0] == 0x04)
 			{
 				settings["txPower"] = int(value[1]);
+			}
+			if (value[0] == 0x05)
+			{
+				// check if invertSerial1 is 1 or 0
+				settings["invertSerial1"] = value[1] == 0x01;
+			}
+			if (value[0] == 0x06)
+			{
+				// check if invertSerial2 is 1 or 0
+				settings["invertSerial2"] = value[1] == 0x01;
 			}
 			// save tghe settings to EEPROM
 			EepromStream eepromStream(0, 512);
@@ -118,8 +151,8 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 				uint8_t buffer[2] = {0x11, 0x54};
 				Serial2.write(buffer, 2);
 			}
-			JsonDocument tempDoc;
-
+			// current time
+			unsigned long startTime = millis();
 			while (1)
 			{
 				if (dataCache.size() > 0 && dataCache[0].containsKey("type"))
@@ -127,11 +160,46 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 					JsonDocument tempDoc;
 					deserializeJson(tempDoc, dataCache[0]);
 					responseDoc["value"] = tempDoc["value"];
-					bleManager.sendData(responseDoc);
+					dataCache.add(responseDoc);
+					// if startTime is greater than 1000ms break
+					if (millis() - startTime > 1000)
+						break;
 					break;
 				}
-				vTaskDelay(1);
+				vTaskDelay(5);
 			}
+			return;
+		}
+		else if (value[0] == 0xf4)
+		{
+			value.erase(0, 1);
+			JsonDocument tempDoc;
+			if (value[0] == 0x01)
+			{
+				value.erase(0, 1);
+				tempDoc["type"] = "serial1 (S)";
+				Serial1.write(value.c_str(), value.length());
+			}
+			else if (value[0] == 0x02)
+			{
+				value.erase(0, 1);
+				tempDoc["type"] = "serial2 (S)";
+				Serial2.write(value.c_str(), value.length());
+			}
+			// send to ble the feedback
+			String bufferString;
+			for (int i = 0; i < value.length(); i++)
+			{
+				String tempString = " 0x";
+				if (value[i] < 0x10)
+					tempString += "0";
+				tempString += String(value[i], HEX);
+				bufferString += tempString;
+			}
+			tempDoc["value"] = bufferString;
+			String tempvalue;
+			serializeJson(tempDoc, tempvalue);
+			dataCache.add(tempvalue);
 		}
 	}
 
@@ -148,12 +216,15 @@ void cacheHandler(void *parameter)
 	{
 		if (dataCache.size() > 0)
 		{
-			serializeJson(dataCache, Serial);
+			// serializeJson(dataCache, Serial);
 			// create an variable json doc with convertToJson(dataCache[0])
 			JsonDocument tempDoc;
 			deserializeJson(tempDoc, dataCache[0]);
-			bleManager.sendData(tempDoc);
 			dataCache.remove(0);
+			if (!bleManager.deviceConnected)
+				continue;
+
+			bleManager.sendData(tempDoc);
 		}
 		vTaskDelay(1); // Yield to other tasks, letting the system breathe
 	}
@@ -272,27 +343,33 @@ void otaTask(void *parameter)
 		vTaskDelay(1); // Yield to other tasks
 	}
 }
-
+String info = "";
 void setup()
 {
+	delay(1000);
+
 	Serial.begin(115200);
-	Serial0.begin(115200, SERIAL_8N1, RX0, TX0);
-	Serial1.begin(1200, SERIAL_8N1, RX1, TX1);
-	Serial2.begin(1200, SERIAL_8N1, RX2, TX2);
+	// Serial0.begin(115200, SERIAL_8N1, RX0, TX0);
 	EEPROM.begin(512);
 	// read the settings from EEPROM
 	EepromStream eepromStream(0, 512);
 	DeserializationError error = deserializeJson(settings, eepromStream);
-	if (error || settings.size() <= 3)
+	if (error || settings.size() <= 5)
 	{
 		settings["name"] = "Biky 12f";
 		settings["password"] = "12345678";
 		settings["packetDelay"] = 10;
 		settings["txPower"] = 9;
+		settings["invertSerial1"] = false;
+		settings["invertSerial2"] = false;
 	}
 	bufferTimeDelay = settings["packetDelay"];
 	bleManager.init(settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settings["txPower"]));
 
+	// swap RX and tx if invertSerial1 is true
+	Serial1.begin(1200, SERIAL_8N1, cRX1, cTX1, settings["invertSerial1"]);
+
+	Serial2.begin(1200, SERIAL_8N1, cRX2, cTX2, settings["invertSerial2"]);
 	WiFi.mode(WIFI_STA);
 	WiFi.begin(ssid, password);
 	while (WiFi.status() != WL_CONNECTED)
@@ -303,23 +380,51 @@ void setup()
 	Serial.println("Connected to WiFi");
 	Serial.println(WiFi.localIP());
 
-	// print out all the settings as name: value
-	for (JsonPair kv : settings.as<JsonObject>())
-	{
-		// send it to jtag
-		esp_log_level_set("*", ESP_LOG_VERBOSE);
-		ESP_LOGW("Settings", "%s: %s", kv.key().c_str(), kv.value().as<String>().c_str());
-	}
-	ArduinoOTA.setHostname(settings["name"].as<String>().c_str());
-	ArduinoOTA.begin();
+	// // ArduinoOTA.setHostname(settings["name"].as<String>().c_str());
+	// // ArduinoOTA.begin();
 
 	// start the task
 	xTaskCreate(serial2ToSerial1, "SerialToSerial1", 8000, NULL, 1, NULL);
 	xTaskCreate(serial1ToSerial2, "Serial1ToSerial", 8000, NULL, 1, NULL);
-	xTaskCreate(otaTask, "OTA", 8000, NULL, 1, NULL);
-	xTaskCreate(cacheHandler, "CacheHandler", 8000, NULL, 1, NULL);
+	// xTaskCreate(otaTask, "OTA", 8000, NULL, 1, NULL);
+	xTaskCreate(cacheHandler, "CacheHandler", 8000, NULL, configMAX_PRIORITIES - 1, NULL);
+
+	// set cs pin
+	pinMode(CD, INPUT_PULLDOWN);
+	// setup sd card and use the custom pins with using spi channel 3
+	// pullup CMD and DATA0
+	SD_MMC.setPins(CLK, CMD, DATA0);
 }
+bool sdInit = false;
 
 void loop()
 {
+	delay(100);
+	if (digitalRead(CD) == HIGH && !sdInit)
+	{
+		sdInit = true;
+		settings["sdCard"] = true;
+		// read it and serial log it
+		SD_MMC.begin("/sdcard", true, false, SDMMC_FREQ_DEFAULT, 4);
+		// print test.txt
+		File file = SD_MMC.open("/test.txt");
+		if (!file)
+		{
+			Serial.println("Failed to open file for reading");
+			return;
+		}
+		Serial.println("File Content:");
+		while (file.available())
+		{
+			Serial.write(file.read());
+		}
+		file.close();
+		Serial.println();
+	}
+	else if (digitalRead(CD) == LOW && sdInit)
+	{
+		sdInit = false;
+		settings["sdCard"] = false;
+		SD_MMC.end();
+	}
 }

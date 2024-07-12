@@ -132,7 +132,7 @@ Thanks for philippsandhaus for providing some protocol information. [link](https
 - 21: 0x64 (Limit speed (%) Assist7 -> 100%)
 - 22: 0x64 (Limit speed (%) Assist8 -> 100%)
 - 23: 0x64 (Limit speed (%) Assist9 -> 100%)
-- 24: Wheel Diameter (Inch):
+- 24: 0x34 (Wheel Diameter -> 20")
 
   | Byte      | Inch |
   | :-------- | :--- |

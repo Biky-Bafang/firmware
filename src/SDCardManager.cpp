@@ -1,37 +1,52 @@
-// #include "SDCardManager.h"
+#include "SDCardManager.h"
+static const char *TAG = "SDCardManager";
 
-// // Constructor
-// SDCardManager::SDCardManager() {}
+// Constructor
+SDCardManager::SDCardManager() : sdCardStatus(0) {}
 
-// // Initialize the SD card
-// void SDCardManager::init()
-// {
-// 	if (!SD_MMC.begin())
-// 	{
-// 		Serial.println("Card Mount Failed");
-// 		return;
-// 	}
-// 	uint8_t cardType = SD_MMC.cardType();
-// 	if (cardType == CARD_NONE)
-// 	{
-// 		Serial.println("No SD card attached");
-// 		return;
-// 	}
-// 	Serial.println("SD card initialized");
-// 	// create rtos task
-// 	xTaskCreate(
-// 		SDCardManager::loop, /* Task function. */
-// 		"SDCardManager",	 /* name of task. */
-// 		10000,				 /* Stack size of task */
-// 		NULL,				 /* parameter of the task */
-// 		1,					 /* priority of the task */
-// 		NULL);				 /* Task handle to keep track of created task */
-// }
+// Initialize the SD card
+void SDCardManager::init()
+{
+	ESP_LOGI(TAG, "Initializing SD card");
 
-// SDCardManager::loop(void *parameter)
-// {
-// 	while (true)
-// 	{
-// 		delay(500);
-// 	}
-// }
+	pinMode(CD, INPUT_PULLDOWN);
+	SD_MMC.setPins(CLK, CMD, DATA0);
+
+	// create rtos task
+	xTaskCreate(
+		SDCardManager::loop, /* Task function. */
+		"SDCardManager",	 /* String with name of task. */
+		10000,				 /* Stack size in bytes. */
+		this,				 /* Parameter passed as input of the task */
+		1,					 /* Priority of the task. */
+		NULL);				 /* Task handle. */
+}
+
+void SDCardManager::loop(void *parameter)
+{
+	SDCardManager *instance = static_cast<SDCardManager *>(parameter);
+	while (true)
+	{
+		// Now you can access instance variables using `instance->`
+
+		if (digitalRead(CD) == HIGH && instance->sdCardStatus == 0)
+		{
+			instance->sdCardStatus = 2;
+			ESP_LOGI(TAG, "SD card inserted");
+			// initialize SD card
+			if (!SD_MMC.begin("/sdcard", true, false, SDMMC_FREQ_DEFAULT, 4))
+			{
+				ESP_LOGE(TAG, "Card Mount Failed");
+				continue;
+			}
+			instance->sdCardStatus = 1;
+		}
+		else if (digitalRead(CD) == LOW && instance->sdCardStatus != 0)
+		{
+			instance->sdCardStatus = 0;
+			ESP_LOGI(TAG, "SD card removed");
+			SD_MMC.end();
+		}
+		delay(500);
+	}
+}

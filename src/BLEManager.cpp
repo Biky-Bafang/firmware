@@ -7,8 +7,9 @@ BLEServer *BLEManager::pServer = nullptr;
 BLECharacteristic *BLEManager::pCharacteristic = nullptr;
 BLECharacteristic *BLEManager::pCharacteristic_1 = nullptr;
 bool BLEManager::deviceConnected = false;
+JsonDocument simpleDoc;
 
-BLEManager::BLEManager() {}
+BLEManager::BLEManager() : dataCache() {}
 
 // create jsonToHexString
 String BLEManager::jsonToHexString(JsonDocument &doc)
@@ -51,6 +52,7 @@ void BLEManager::init(
 	BLECharacteristicCallbacks *charCallbacks,
 	esp_power_level_t powerLevel)
 {
+	dataCache = simpleDoc.to<JsonArray>();
 	BLEDevice::init(deviceName.c_str());
 	pServer = BLEDevice::createServer();
 	BLEDevice::setPower(powerLevel);
@@ -82,8 +84,41 @@ void BLEManager::stop()
 	BLEDevice::deinit(true);
 }
 
+void BLEManager::cacheHandler(void *parameter)
+{
+	BLEManager *instance = static_cast<BLEManager *>(parameter);
+
+	while (1)
+	{
+		if (dataCache.size() > 0)
+		{
+			// serializeJson(dataCache, Serial);
+			// create an variable json doc with convertToJson(dataCache[0])
+			JsonDocument tempDoc;
+			deserializeJson(tempDoc, dataCache[0]);
+			dataCache.remove(0);
+			if (!instance->deviceConnected)
+				continue;
+
+			instance->sendData(tempDoc, false);
+		}
+		vTaskDelay(1); // Yield to other tasks, letting the system breathe
+	}
+}
+
 void BLEManager::sendData(JsonDocument &doc)
 {
+	sendData(doc, true);
+}
+void BLEManager::sendData(JsonDocument &doc, bool cached)
+{
+	if (cached)
+	{
+		String tempvalue;
+		serializeJson(doc, tempvalue);
+		dataCache.add(tempvalue);
+		return;
+	}
 	if (deviceConnected)
 	{
 		String hexString = jsonToHexString(doc);

@@ -18,9 +18,11 @@ public:
 		esp_power_level_t powerLevel = ESP_PWR_LVL_P9);
 	void stop();
 	void sendData(JsonDocument &doc); // Pass by reference
+	void sendData(JsonDocument &doc, bool cached);
 	static bool deviceConnected;
 	String jsonToHexString(JsonDocument &doc);
 	esp_power_level_t powerLevel(int powerLevel);
+	JsonArray dataCache;
 
 private:
 	static BLEServer *pServer;
@@ -28,6 +30,7 @@ private:
 	static BLECharacteristic *pCharacteristic_1;
 	void onConnect(BLEServer *pServer) override;
 	void onDisconnect(BLEServer *pServer) override;
+	void cacheHandler(void *parameter);
 };
 
 #endif // BLE_MANAGER_H

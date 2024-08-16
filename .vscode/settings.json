@@ -1,22 +1,12 @@
 {
-	"idf.portWin": "COM4",
-	"files.associations": {
-		"*.embeddedhtml": "html",
-		"istream": "cpp",
-		"ostream": "cpp",
-		"array": "cpp",
-		"deque": "cpp",
-		"string": "cpp",
-		"unordered_map": "cpp",
-		"vector": "cpp",
-		"string_view": "cpp",
-		"initializer_list": "cpp",
-		"regex": "cpp",
-		"typeinfo": "cpp",
-		"new": "cpp",
-		"cstddef": "cpp",
-		"functional": "cpp",
-		"unordered_set": "cpp"
-	},
-	"discord.enabled": true
+  "files.associations": {
+	"*.embeddedhtml": "html",
+	"*.tcc": "cpp",
+	"algorithm": "cpp",
+	"new": "cpp",
+	"array": "cpp",
+	"string_view": "cpp",
+	"initializer_list": "cpp",
+	"utility": "cpp"
+}
 }

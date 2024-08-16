@@ -5,7 +5,6 @@ SettingsManager::SettingsManager() : settings() {}
 
 static const char *TAG = "SettingsManager";
 
-// Initialize the SD card
 void SettingsManager::init()
 {
 	ESP_LOGI(TAG, "Initializing Settings");
@@ -14,12 +13,12 @@ void SettingsManager::init()
 	DeserializationError error = deserializeJson(settings, eepromStream);
 	if (error || settings.size() <= 5)
 	{
-		settings["name"] = "Biky 12f";
-		settings["password"] = "12345678";
-		settings["packetDelay"] = 10;
-		settings["txPower"] = 9;
-		settings["invertSerial1"] = false;
-		settings["invertSerial2"] = false;
+		settings["name"] = settings["name"] | "Biky 12f";
+		settings["password"] = settings["password"] | "12345678";
+		settings["packetDelay"] = settings["packetDelay"] | 10;
+		settings["txPower"] = settings["txPower"] | 9;
+		settings["invertSerial1"] = settings["invertSerial1"] | false;
+		settings["invertSerial2"] = settings["invertSerial2"] | false;
 	}
 	xTaskCreate(
 		SettingsManager::loop, /* Task function. */

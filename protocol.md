@@ -276,7 +276,7 @@ Thanks for philippsandhaus for providing some protocol information. [link](https
 
 ## Command: Read Speed
 
-- Send: 0x11 0x22
+- Send: 0x11 0x20
 - Response 0x00 0x00 0x20
 
 ### Send (Description)

@@ -2,7 +2,9 @@
 #include "BLEManager.h"
 #include "SDCardManager.h"
 #include "WifiManager.h"
+#include <LittleFS.h>
 #include "SettingsManager.h"
+#include "SerialManager.h"
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
@@ -15,20 +17,74 @@ BLEManager bleManager;
 SDCardManager sdCardManager;
 WifiManager wifiManager;
 SettingsManager settingsManager;
+SerialManager serialManager;
+JsonDocument settingsVar;
 
 static const char *TAG = "Main";
+
+JsonDocument getVariables()
+{
+	JsonDocument doc;
+
+	File file = LittleFS.open("/variables.bin", "r");
+	if (!file)
+	{
+		ESP_LOGE(TAG, "Failed to open file for reading");
+		return doc;
+	}
+	ESP_LOGI(TAG, "File Content:");
+	// the file looks like: variable=value\n so split it by = and put it in the doc. so {variable: value} and each \n is a new variable and it has
+	while (file.available())
+	{
+		String variables = file.readString();
+		deserializeJson(doc, variables);
+	}
+	return doc;
+}
+JsonDocument getDocVariables()
+{
+	JsonDocument doc;
+	JsonDocument variables = getVariables();
+	for (int i = 0; i < variables.size(); i++)
+	{
+		String id = variables[i]["id"];
+		String value = variables[i]["value"];
+		doc[id] = value;
+	}
+	return doc;
+}
 
 class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 {
 	void onWrite(BLECharacteristic *pCharacteristic) override
 	{
+		JsonDocument &settings = settingsManager.getSettings();
 		std::string value = pCharacteristic->getValue();
+		// print the value to console with hex
+		String result;
+		for (int i = 0; i < value.length(); i++)
+		{
+			// if value[0] == 0xf2 and i is more than 1 then add it as ascii instead of hex
+			if (value[0] == 0xf2 && i > 1)
+			{
+				if (i == 2)
+					result += " ";
+				result += value[i];
+				continue;
+			}
+			String tempString = " 0x";
+			if (value[i] < 0x10)
+				tempString += "0";
+			tempString += String(value[i], HEX);
+			result += tempString;
+		}
+		ESP_LOGI(TAG, "Received: %s", result.c_str());
 		if (value[0] == 0xf1)
 		{
 			value.erase(0, 1);
 			if (value[0] == 0x01)
 			{
-				bleManager.sendData(settingsManager.settings);
+				bleManager.sendData(settings);
 				return;
 			}
 			if (value[0] == 0x02)
@@ -47,7 +103,12 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 			if (value[0] == 0x04)
 			{
 				JsonDocument responseDoc;
-				deserializeJson(responseDoc, "{\"sd\":[],\"core\":[{\"id\":\"Core-0\",\"icon\":\"faBluetoothB\",\"label\":\"Start\",\"nodes\":5,\"triggers\":1}]}");
+				deserializeJson(responseDoc, "{\"sd\":[]}");
+				JsonDocument tempDoc;
+				deserializeJson(tempDoc, "{\"id\":\"Core-0\",\"icon\":\"faBluetoothB\",\"label\":\"Start\",\"nodes\":5,\"triggers\":1}");
+				responseDoc["core"].add(tempDoc);
+				responseDoc["variables"] = getVariables();
+				serializeJsonPretty(responseDoc, Serial);
 				bleManager.sendData(responseDoc);
 				return;
 			}
@@ -181,20 +242,24 @@ void otaTask(void *parameter)
 void setup()
 {
 	Serial.begin(115200);
-	esp_log_level_set("*", ESP_LOG_VERBOSE);
-	delay(1000);
 	ESP_LOGI(TAG, "Starting...");
 
 	settingsManager.init();
 	sdCardManager.init();
+	serialManager.init(settingsManager.settings["invertSerial1"], settingsManager.settings["invertSerial2"], settingsManager.settings["packetDelay"]);
 	bleManager.init(settingsManager.settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settingsManager.settings["txPower"]));
 	wifiManager.init();
-
-	// xTaskCreate(otaTask, "OTA", 8000, NULL, 1, NULL);
+	// mount filesystem
+	if (!LittleFS.begin())
+	{
+		ESP_LOGE(TAG, "Failed to mount file system");
+		return;
+	}
 }
-
 void loop()
 {
-	delay(500);
+	delay(200);
 	settingsManager.settings["sdCard"] = sdCardManager.sdCardStatus;
+	settingsManager.settings["wifi"] = wifiManager.wifiStatus;
+	settingsManager.settings["ble"] = bleManager.bleStatus;
 }

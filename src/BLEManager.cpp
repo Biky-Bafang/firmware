@@ -8,8 +8,9 @@ BLECharacteristic *BLEManager::pCharacteristic = nullptr;
 BLECharacteristic *BLEManager::pCharacteristic_1 = nullptr;
 bool BLEManager::deviceConnected = false;
 JsonDocument simpleDoc;
+static const char *TAG = "BLEManager";
 
-BLEManager::BLEManager() : dataCache() {}
+BLEManager::BLEManager() {}
 
 // create jsonToHexString
 String BLEManager::jsonToHexString(JsonDocument &doc)
@@ -52,6 +53,8 @@ void BLEManager::init(
 	BLECharacteristicCallbacks *charCallbacks,
 	esp_power_level_t powerLevel)
 {
+	delay(2000);
+	ESP_LOGI(TAG, "Initializing BLE");
 	dataCache = simpleDoc.to<JsonArray>();
 	BLEDevice::init(deviceName.c_str());
 	pServer = BLEDevice::createServer();
@@ -76,6 +79,8 @@ void BLEManager::init(
 	pAdvertising->setScanResponse(false);
 	pAdvertising->setMinPreferred(0x0);
 	BLEDevice::startAdvertising();
+	// run cacheHandler in a task
+	xTaskCreate(BLEManager::cacheHandler, "cacheHandler", 4096, this, 5, NULL);
 }
 
 void BLEManager::stop()
@@ -90,17 +95,18 @@ void BLEManager::cacheHandler(void *parameter)
 
 	while (1)
 	{
-		if (dataCache.size() > 0)
+		// print the dataCache
+		if (instance->dataCache.size() > 0)
 		{
 			// serializeJson(dataCache, Serial);
 			// create an variable json doc with convertToJson(dataCache[0])
 			JsonDocument tempDoc;
-			deserializeJson(tempDoc, dataCache[0]);
-			dataCache.remove(0);
+			deserializeJson(tempDoc, instance->dataCache[0]);
+			instance->dataCache.remove(0);
 			if (!instance->deviceConnected)
 				continue;
-
 			instance->sendData(tempDoc, false);
+			ESP_LOGD(TAG, "Sending from cache: %s", tempDoc.as<String>().c_str());
 		}
 		vTaskDelay(1); // Yield to other tasks, letting the system breathe
 	}
@@ -108,7 +114,7 @@ void BLEManager::cacheHandler(void *parameter)
 
 void BLEManager::sendData(JsonDocument &doc)
 {
-	sendData(doc, true);
+	return sendData(doc, true);
 }
 void BLEManager::sendData(JsonDocument &doc, bool cached)
 {
@@ -122,6 +128,7 @@ void BLEManager::sendData(JsonDocument &doc, bool cached)
 	if (deviceConnected)
 	{
 		String hexString = jsonToHexString(doc);
+		hexString += "9a";
 		size_t jsonLength = hexString.length() / 2; // Each byte is represented by two hex characters
 		size_t offset = 0;
 
@@ -147,12 +154,23 @@ void BLEManager::sendData(JsonDocument &doc, bool cached)
 
 void BLEManager::onConnect(BLEServer *pServer)
 {
+	ESP_LOGI(TAG, "Device connected");
 	deviceConnected = true;
+	bleStatus = 1;
+	// esp log the user
 }
 
 void BLEManager::onDisconnect(BLEServer *pServer)
 {
+	ESP_LOGI(TAG, "Device disconnected");
 	deviceConnected = false;
-	// start advertising
+	bleStatus = 0;
 	BLEDevice::startAdvertising();
+}
+
+void BLEManager::requestSettingsUpdate()
+{
+	// send a request to the device with 0x40 as the first byte
+	pCharacteristic->setValue({0x40});
+	pCharacteristic->notify();
 }

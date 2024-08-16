@@ -29,7 +29,7 @@ void SDCardManager::loop(void *parameter)
 	{
 		// Now you can access instance variables using `instance->`
 
-		if (digitalRead(CD) == HIGH && instance->sdCardStatus == 0)
+		if (digitalRead(CD) == HIGH && (instance->sdCardStatus == 0 || instance->sdCardStatus == 2))
 		{
 			instance->sdCardStatus = 2;
 			ESP_LOGI(TAG, "SD card inserted");
@@ -37,6 +37,7 @@ void SDCardManager::loop(void *parameter)
 			if (!SD_MMC.begin("/sdcard", true, false, SDMMC_FREQ_DEFAULT, 4))
 			{
 				ESP_LOGE(TAG, "Card Mount Failed");
+				delay(1000);
 				continue;
 			}
 			instance->sdCardStatus = 1;
@@ -45,6 +46,7 @@ void SDCardManager::loop(void *parameter)
 		{
 			instance->sdCardStatus = 0;
 			ESP_LOGI(TAG, "SD card removed");
+
 			SD_MMC.end();
 		}
 		delay(500);

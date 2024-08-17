@@ -6,15 +6,11 @@ static const char *TAG = "WifiManager";
 // Constructor
 WifiManager::WifiManager() : wifiStatus(0), server(80) {}
 
+TaskHandle_t WifiManager::taskHandle = NULL;
+
 // Initialize the WiFi and server
-void WifiManager::init()
+void WifiManager::init(JsonDocument *settings)
 {
-	ESP_LOGI(TAG, "Initializing LittleFS");
-	if (!LittleFS.begin())
-	{
-		ESP_LOGE(TAG, "Failed to mount LittleFS");
-		return;
-	}
 
 	ESP_LOGI(TAG, "Initializing WiFi");
 	WiFi.mode(WIFI_STA);
@@ -26,14 +22,25 @@ void WifiManager::init()
 	// Start the server
 	server.begin();
 
+	WifiParams *params = new WifiParams{*settings, this};
 	// Start the WiFi manager task
 	xTaskCreate(
 		WifiManager::loop, /* Task function. */
 		"WiFiManager",	   /* String with name of task. */
 		10000,			   /* Stack size in bytes. */
-		this,			   /* Parameter passed as input of the task */
+		params,			   /* Parameter passed as input of the task */
 		1,				   /* Priority of the task. */
-		NULL);			   /* Task handle. */
+		&taskHandle);	   /* Task handle. */
+}
+
+// make an restart function
+void WifiManager::restart(JsonDocument *settings)
+{
+	vTaskDelete(taskHandle);
+	taskHandle = NULL;
+	(*settings)["wifiStatus"] = 0;
+	WiFi.disconnect();
+	init(settings);
 }
 
 void WifiManager::handleFileDownload()
@@ -51,13 +58,14 @@ void WifiManager::handleFileDownload()
 
 void WifiManager::loop(void *parameter)
 {
-	WifiManager *instance = static_cast<WifiManager *>(parameter);
+	WifiParams *params = static_cast<WifiParams *>(parameter);
+	JsonDocument *settings = &params->settings;
 	int time = 0;
 	while (true)
 	{
 		if (WiFi.status() == WL_CONNECTED)
 		{
-			instance->wifiStatus = 1;
+			(*settings)["wifiStatus"] = 1;
 
 			if (millis() - time > 8000)
 			{
@@ -67,15 +75,18 @@ void WifiManager::loop(void *parameter)
 			delay(1000);
 			continue;
 		}
-		if (instance->wifiStatus != 0)
+		if ((*settings)["wifiStatus"] != 0)
 		{
 			ESP_LOGI(TAG, "Retrying in 5 seconds");
-			instance->wifiStatus = 0;
+			(*settings)["wifiStatus"] = 0;
 			delay(5000);
 		}
 		ESP_LOGI(TAG, "Connecting to WiFi");
-		instance->wifiStatus = 0;
-		WiFi.begin(SSID, PASSWORD);
+		(*settings)["wifiStatus"] = 0;
+		// use ssid and password from init
+		const char *ssid = (*settings)["ssid"];
+		const char *password = (*settings)["password"];
+		WiFi.begin(ssid, password);
 		int i = millis();
 		while (WiFi.status() != WL_CONNECTED && millis() - i < 10000 && WiFi.status() != WL_CONNECT_FAILED)
 		{
@@ -83,27 +94,18 @@ void WifiManager::loop(void *parameter)
 		}
 		if (WiFi.status() != WL_CONNECTED)
 		{
-			instance->wifiStatus = 2;
+			(*settings)["wifiStatus"] = 2;
 			WiFi.disconnect();
 			ESP_LOGE(TAG, "WiFi connection failed");
 		}
 		else
 		{
-			instance->wifiStatus = 1;
+			(*settings)["wifiStatus"] = 1;
 			ESP_LOGI(TAG, "WiFi connected");
-			ESP_LOGI(TAG, "Connected to %s", SSID);
+			ESP_LOGI(TAG, "Connected to %s", ssid);
 			ESP_LOGI(TAG, "IP address: %s", WiFi.localIP().toString().c_str());
+			(*settings)["ip"] = WiFi.localIP();
 			ESP_LOGI(TAG, "Signal strength: %d dBm", WiFi.RSSI());
-			// get public IP
-			HTTPClient http;
-			http.begin("http://api.ipify.org");
-			int httpCode = http.GET();
-			if (httpCode > 0)
-			{
-				String payload = http.getString();
-				ESP_LOGI(TAG, "Public IP address: %s", payload.c_str());
-			}
-			http.end();
 		}
 	}
 }

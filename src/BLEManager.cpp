@@ -9,6 +9,7 @@ BLECharacteristic *BLEManager::pCharacteristic_1 = nullptr;
 bool BLEManager::deviceConnected = false;
 JsonDocument simpleDoc;
 static const char *TAG = "BLEManager";
+TaskHandle_t BLEManager::taskHandle = NULL;
 
 BLEManager::BLEManager() {}
 
@@ -80,12 +81,25 @@ void BLEManager::init(
 	pAdvertising->setMinPreferred(0x0);
 	BLEDevice::startAdvertising();
 	// run cacheHandler in a task
-	xTaskCreate(BLEManager::cacheHandler, "cacheHandler", 4096, this, 5, NULL);
+	xTaskCreate(BLEManager::cacheHandler, "cacheHandler", 4096, this, 5, &taskHandle);
+}
+void BLEManager::restart(
+	String deviceName,
+	BLECharacteristicCallbacks *charCallbacks,
+	esp_power_level_t powerLevel)
+{
+	stop();
+	init(deviceName, charCallbacks, powerLevel);
+}
+void BLEManager::setPowerLevel(esp_power_level_t powerLevel)
+{
+	BLEDevice::setPower(powerLevel);
 }
 
 void BLEManager::stop()
 {
-	// turn off BLE
+	vTaskDelete(taskHandle);
+	taskHandle = NULL;
 	BLEDevice::deinit(true);
 }
 
@@ -116,6 +130,11 @@ void BLEManager::sendData(JsonDocument &doc)
 {
 	return sendData(doc, true);
 }
+void BLEManager::sendData(JsonDocument *doc)
+{
+	return sendData(*doc, true);
+}
+
 void BLEManager::sendData(JsonDocument &doc, bool cached)
 {
 	if (cached)

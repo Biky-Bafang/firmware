@@ -18,7 +18,7 @@ SDCardManager sdCardManager;
 WifiManager wifiManager;
 SettingsManager settingsManager;
 SerialManager serialManager;
-JsonDocument settingsVar;
+JsonDocument settings;
 
 static const char *TAG = "Main";
 
@@ -32,6 +32,7 @@ JsonDocument getVariables()
 		ESP_LOGE(TAG, "Failed to open file for reading");
 		return doc;
 	}
+
 	ESP_LOGI(TAG, "File Content:");
 	// the file looks like: variable=value\n so split it by = and put it in the doc. so {variable: value} and each \n is a new variable and it has
 	while (file.available())
@@ -41,24 +42,11 @@ JsonDocument getVariables()
 	}
 	return doc;
 }
-JsonDocument getDocVariables()
-{
-	JsonDocument doc;
-	JsonDocument variables = getVariables();
-	for (int i = 0; i < variables.size(); i++)
-	{
-		String id = variables[i]["id"];
-		String value = variables[i]["value"];
-		doc[id] = value;
-	}
-	return doc;
-}
 
 class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 {
 	void onWrite(BLECharacteristic *pCharacteristic) override
 	{
-		JsonDocument &settings = settingsManager.getSettings();
 		std::string value = pCharacteristic->getValue();
 		// print the value to console with hex
 		String result;
@@ -84,7 +72,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 			value.erase(0, 1);
 			if (value[0] == 0x01)
 			{
-				bleManager.sendData(settings);
+				bleManager.sendData(&settings);
 				return;
 			}
 			if (value[0] == 0x02)
@@ -94,9 +82,9 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 			}
 			if (value[0] == 0x03)
 			{
-				settingsManager.settings.clear();
+				settings.clear();
 				EepromStream eepromStream(0, 512);
-				serializeJson(settingsManager.settings, eepromStream);
+				serializeJson(settings, eepromStream);
 				EEPROM.commit();
 				return;
 			}
@@ -116,35 +104,44 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 		else if (value[0] == 0xf2)
 		{
 			value.erase(0, 1);
+			if (value[0] == 0x00)
+			{
+				settings["name"] = value.substr(1);
+			}
 			if (value[0] == 0x01)
 			{
-				settingsManager.settings["name"] = value.substr(1);
+				settings["ssid"] = value.substr(1);
+				wifiManager.restart(&settings);
 			}
 			if (value[0] == 0x02)
 			{
-				settingsManager.settings["password"] = value.substr(1);
+				settings["password"] = value.substr(1);
+				wifiManager.restart(&settings);
 			}
 			if (value[0] == 0x03)
 			{
-				settingsManager.settings["packetDelay"] = int(value[1]);
+				settings["packetDelay"] = int(value[1]);
+				serialManager.restart(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
 			}
 			if (value[0] == 0x04)
 			{
-				settingsManager.settings["txPower"] = int(value[1]);
+				settings["txPower"] = int(value[1]);
+				bleManager.setPowerLevel(bleManager.powerLevel(settings["txPower"]));
 			}
 			if (value[0] == 0x05)
 			{
-				// check if invertSerial1 is 1 or 0
-				settingsManager.settings["invertSerial1"] = value[1] == 0x01;
+				settings["invertSerial1"] = value[1] == 0x01;
+				serialManager.restart(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
 			}
 			if (value[0] == 0x06)
 			{
 				// check if invertSerial2 is 1 or 0
-				settingsManager.settings["invertSerial2"] = value[1] == 0x01;
+				settings["invertSerial2"] = value[1] == 0x01;
+				serialManager.restart(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
 			}
-			// save tghe settingsManager.settings to EEPROM
+			// save the settings to EEPROM
 			EepromStream eepromStream(0, 512);
-			serializeJson(settingsManager.settings, eepromStream);
+			serializeJson(settings, eepromStream);
 			EEPROM.commit();
 		}
 		else if (value[0] == 0xf3)
@@ -226,40 +223,26 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 	}
 };
 
-// create an task to send the data to ble
-
-// create an task so when it recieves on Serial it will send it to Serial1
-
-void otaTask(void *parameter)
-{
-	while (1)
-	{
-		ArduinoOTA.handle();
-		vTaskDelay(1); // Yield to other tasks
-	}
-}
-
 void setup()
 {
 	Serial.begin(115200);
+	delay(500);
 	ESP_LOGI(TAG, "Starting...");
-
-	settingsManager.init();
-	sdCardManager.init();
-	serialManager.init(settingsManager.settings["invertSerial1"], settingsManager.settings["invertSerial2"], settingsManager.settings["packetDelay"]);
-	bleManager.init(settingsManager.settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settingsManager.settings["txPower"]));
-	wifiManager.init();
-	// mount filesystem
 	if (!LittleFS.begin())
 	{
 		ESP_LOGE(TAG, "Failed to mount file system");
 		return;
 	}
+
+	settingsManager.init(&settings);
+	serializeJsonPretty(settings, Serial);
+	sdCardManager.init(&settings);
+	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
+	bleManager.init(settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settings["txPower"]));
+	wifiManager.init(&settings);
 }
 void loop()
 {
-	delay(200);
-	settingsManager.settings["sdCard"] = sdCardManager.sdCardStatus;
-	settingsManager.settings["wifi"] = wifiManager.wifiStatus;
-	settingsManager.settings["ble"] = bleManager.bleStatus;
+	// ArduinoOTA.handle();
+	vTaskDelete(NULL);
 }

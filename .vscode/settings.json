@@ -7,6 +7,16 @@
 	"array": "cpp",
 	"string_view": "cpp",
 	"initializer_list": "cpp",
-	"utility": "cpp"
+	"utility": "cpp",
+	"unordered_map": "cpp",
+	"fstream": "cpp",
+	"istream": "cpp",
+	"ostream": "cpp",
+	"sstream": "cpp",
+	"deque": "cpp",
+	"list": "cpp",
+	"string": "cpp",
+	"unordered_set": "cpp",
+	"vector": "cpp"
 }
 }

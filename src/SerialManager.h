@@ -17,11 +17,14 @@ class SerialManager // Class declaration
 public:
 	SerialManager(); // Constructor declaration
 	void init(bool invert1, bool invert2, int packetDelay);
+	void restart(bool invert1, bool invert2, int packetDelay);
 	int wifiStatus; // 0: Disconnected, 1: Connected, 2: Connection failed
 
 private:
 	static void serial1ToSerial2(void *parameter);
 	static void serial2ToSerial1(void *parameter);
+	static TaskHandle_t taskHandle1;
+	static TaskHandle_t taskHandle2;
 };
 
 #endif // Header guard end

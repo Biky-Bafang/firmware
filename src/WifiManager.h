@@ -7,9 +7,7 @@
 #include <HTTPClient.h>
 #include <LittleFS.h>
 #include <WebServer.h>
-
-#define SSID "decop7"
-#define PASSWORD "!10057704a"
+#include <ArduinoJson.h>
 
 // Class definition
 
@@ -28,12 +26,19 @@ public:
 	void operator=(WifiManager const &) = delete;
 
 	int wifiStatus;
-	void init();
+	void init(JsonDocument *settings);
+	void restart(JsonDocument *settings);
 
 private:
 	static void loop(void *parameter);
 	void handleFileDownload(); // Function declaration for file download
 	WebServer server{80};	   // HTTP server on port 80
+	struct WifiParams
+	{
+		JsonDocument &settings;
+		WifiManager *instance; // Add instance pointer for accessing non-static members
+	};
+	static TaskHandle_t taskHandle;
 };
 
 #endif // Header guard end

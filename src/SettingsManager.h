@@ -12,6 +12,12 @@ class SettingsManager // Class declaration
 public:
 	SettingsManager(); // Constructor declaration
 
+	struct WifiParams
+	{
+		const char *ssid;
+		const char *password;
+	};
+
 	static SettingsManager &getInstance()
 	{
 		static SettingsManager instance;
@@ -21,7 +27,7 @@ public:
 	SettingsManager(SettingsManager const &) = delete;
 	void operator=(SettingsManager const &) = delete;
 
-	void init();
+	void init(JsonDocument *settings);
 	JsonDocument settings;
 	JsonDocument &getSettings() { return settings; }
 

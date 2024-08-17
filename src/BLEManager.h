@@ -24,8 +24,14 @@ public:
 		String deviceName,
 		BLECharacteristicCallbacks *charCallbacks,
 		esp_power_level_t powerLevel = ESP_PWR_LVL_P9);
+	void restart(
+		String deviceName,
+		BLECharacteristicCallbacks *charCallbacks,
+		esp_power_level_t powerLevel = ESP_PWR_LVL_P9);
+	void setPowerLevel(esp_power_level_t powerLevel);
 	void stop();
 	void sendData(JsonDocument &doc); // Pass by reference
+	void sendData(JsonDocument *doc); // Pass by reference
 	void sendData(JsonDocument &doc, bool cached);
 	void requestSettingsUpdate();
 	static bool deviceConnected;
@@ -47,6 +53,7 @@ private:
 	void onDisconnect(BLEServer *pServer) override;
 
 	SemaphoreHandle_t dataCacheMutex;
+	static TaskHandle_t taskHandle;
 };
 
 #endif // BLE_MANAGER_H

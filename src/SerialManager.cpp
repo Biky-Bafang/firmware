@@ -6,6 +6,8 @@ SerialManager::SerialManager() : wifiStatus(0) {}
 
 static const char *TAG = "SerialManager";
 int packetDelayVar = 0;
+TaskHandle_t SerialManager::taskHandle1 = NULL;
+TaskHandle_t SerialManager::taskHandle2 = NULL;
 
 // Initialize the SD card
 void SerialManager::init(bool invert1, bool invert2, int packetDelay)
@@ -20,14 +22,22 @@ void SerialManager::init(bool invert1, bool invert2, int packetDelay)
 		10000,							 /* Stack size in bytes. */
 		this,							 /* Parameter passed as input of the task */
 		1,								 /* Priority of the task. */
-		NULL);							 /* Task handle. */
+		&taskHandle1);					 /* Task handle. */
 	xTaskCreate(
 		SerialManager::serial2ToSerial1, /* Task function. */
 		"serial2ToSerial1",				 /* String with name of task. */
 		10000,							 /* Stack size in bytes. */
 		this,							 /* Parameter passed as input of the task */
 		1,								 /* Priority of the task. */
-		NULL);							 /* Task handle. */
+		&taskHandle2);					 /* Task handle. */
+}
+void SerialManager::restart(bool invert1, bool invert2, int packetDelay)
+{
+	vTaskDelete(taskHandle1);
+	vTaskDelete(taskHandle2);
+	taskHandle1 = NULL;
+	taskHandle2 = NULL;
+	init(invert1, invert2, packetDelay);
 }
 
 void SerialManager::serial1ToSerial2(void *parameter)

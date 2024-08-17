@@ -2,6 +2,7 @@
 #define SDCARDMANAGER_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <SD_MMC.h>
 #include <FS.h>
 #include <RTOS.h>
@@ -16,8 +17,8 @@ class SDCardManager
 {
 public:
 	SDCardManager(); // Constructor declaration
-	void init();
-	int sdCardStatus; // 0: Not inserted, 1: Inserted, 2: Mount failed
+	void init(JsonDocument *settings);
+	void restart(JsonDocument *settings);
 	void writeData(String data);
 	void readData();
 	void deleteData();
@@ -33,6 +34,12 @@ public:
 
 private:
 	static void loop(void *parameter);
+	struct sdCardParams
+	{
+		JsonDocument &settings;
+		SDCardManager *instance; // Add instance pointer for accessing non-static members
+	};
+	static TaskHandle_t taskHandle;
 };
 
 #endif // Header guard end

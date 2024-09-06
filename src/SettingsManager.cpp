@@ -5,7 +5,7 @@ SettingsManager::SettingsManager() {}
 
 static const char *TAG = "SettingsManager";
 
-void SettingsManager::init(JsonDocument *settings)
+void SettingsManager::init(JsonDocument *settings, JsonDocument *flows)
 {
 	ESP_LOGI(TAG, "Initializing Settings");
 	EEPROM.begin(512);
@@ -22,6 +22,9 @@ void SettingsManager::init(JsonDocument *settings)
 		(*settings)["invertSerial1"] = (*settings)["invertSerial1"] | false;
 		(*settings)["invertSerial2"] = (*settings)["invertSerial2"] | false;
 	}
+	(*settings)["firmwareVersion"] = firmwareVersion;
+	(*settings)["hardwareVersion"] = hardwareVersion;
+	deserializeJson(*flows, "{\"flows\":[],\"variables\":[]}");
 	xTaskCreate(
 		SettingsManager::loop, /* Task function. */
 		"SettingsManager",	   /* String with name of task. */
@@ -35,6 +38,7 @@ void SettingsManager::loop(void *parameter)
 {
 	while (true)
 	{
-		vTaskDelay(5000);
+		
+		vTaskDelay(5 / portTICK_PERIOD_MS);
 	}
 }

@@ -21,14 +21,14 @@ void SerialManager::init(bool invert1, bool invert2, int packetDelay)
 		"serial1ToSerial2",				 /* String with name of task. */
 		10000,							 /* Stack size in bytes. */
 		this,							 /* Parameter passed as input of the task */
-		1,								 /* Priority of the task. */
+		2,								 /* Priority of the task. */
 		&taskHandle1);					 /* Task handle. */
 	xTaskCreate(
 		SerialManager::serial2ToSerial1, /* Task function. */
 		"serial2ToSerial1",				 /* String with name of task. */
 		10000,							 /* Stack size in bytes. */
 		this,							 /* Parameter passed as input of the task */
-		1,								 /* Priority of the task. */
+		2,								 /* Priority of the task. */
 		&taskHandle2);					 /* Task handle. */
 }
 void SerialManager::restart(bool invert1, bool invert2, int packetDelay)
@@ -87,7 +87,7 @@ void SerialManager::serial1ToSerial2(void *parameter)
 			bufferIndex = 0;
 			memset(buffer, 0, sizeof(buffer));
 		}
-		vTaskDelay(10); // Yield to other tasks
+		vTaskDelay(5); // Yield to other tasks
 	}
 }
 void SerialManager::serial2ToSerial1(void *parameter)
@@ -138,7 +138,7 @@ void SerialManager::serial2ToSerial1(void *parameter)
 			bufferIndex = 0;
 			memset(buffer, 0, sizeof(buffer));
 		}
-		vTaskDelay(10); // Yield to other tasks
+		vTaskDelay(5); // Yield to other tasks
 	}
 }
 

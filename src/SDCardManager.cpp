@@ -41,16 +41,20 @@ void SDCardManager::loop(void *parameter)
 
 		if (digitalRead(CD) == HIGH && ((*settings)["sdCardStatus"] == 0 || (*settings)["sdCardStatus"] == 2))
 		{
-			(*settings)["sdCardStatus"] = 2;
+			(*settings)["sdCardStatus"] = 1;
 			ESP_LOGI(TAG, "SD card inserted");
 			// initialize SD card
 			if (!SD_MMC.begin("/sdcard", true, false, SDMMC_FREQ_DEFAULT, 4))
 			{
+				(*settings)["sdCardStatus"] = 2;
 				ESP_LOGE(TAG, "Card Mount Failed");
 				delay(1000);
 				continue;
 			}
-			(*settings)["sdCardStatus"] = 1;
+			ESP_LOGI(TAG, "SD Card Type: %s", SD_MMC.cardType() == CARD_NONE ? "No SD card attached" : SD_MMC.cardType() == CARD_MMC ? "MMC"
+																								   : SD_MMC.cardType() == CARD_SD	 ? "SDSC"
+																								   : SD_MMC.cardType() == CARD_SDHC	 ? "SDHC"
+																																	 : "UNKNOWN");
 		}
 		else if (digitalRead(CD) == LOW && (*settings)["sdCardStatus"] != 0)
 		{

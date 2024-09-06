@@ -5,6 +5,7 @@
 #include <LittleFS.h>
 #include "SettingsManager.h"
 #include "SerialManager.h"
+#include "LuaManager.h"
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
@@ -21,8 +22,10 @@
 #include <string.h>
 
 #include "lua/rtoslib.h"
+#include "lua/esplib.h"
 
-extern "C"{
+extern "C"
+{
 #include <lua/lua.h>
 #include <lua/lauxlib.h>
 #include <lua/lualib.h>
@@ -33,19 +36,13 @@ SDCardManager sdCardManager;
 WifiManager wifiManager;
 SettingsManager settingsManager;
 SerialManager serialManager;
+LuaManager luaManager;
 
 JsonDocument settings;
 JsonDocument flows;
 std::unordered_map<std::string, int> variables;
 
 static const char *TAG = "Main";
-
-static void load_custom_libs(lua_State *L)
-{
-    luaL_requiref(L, "rtos", luaopen_lrtos, 1);
-    lua_pop(L, 1);
-}
-
 
 class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 {
@@ -301,15 +298,12 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 		// Handle read request
 	}
 };
-lua_State *L = luaL_newstate();
+
 int maxHeapSize = 0;
 void setup()
 {
-	// set maxHeapSize to the maximum heap size
 	maxHeapSize = ESP.getFreeHeap();
 	Serial.begin(115200);
-	luaL_openlibs(L);
-	load_custom_libs(L);
 	delay(1000);
 	ESP_LOGI(TAG, "Starting...");
 	if (!LittleFS.begin())
@@ -362,31 +356,11 @@ void setup()
 	serializeJsonPretty(settings, Serial);
 	sdCardManager.init(&settings);
 	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
+	luaManager.init(&settings);
 	bleManager.init(settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settings["txPower"]));
 	wifiManager.init(&settings);
 }
-	int wait = millis();
 void loop()
 {
-	File file = LittleFS.open("/flows/Core-0.lua", "r");
-	if (!file)
-	{
-		ESP_LOGE(TAG, "Failed to open file for reading");
-		return;
-	}
-	String luaScript = file.readString();
-	
-	int start = millis();
-	ESP_LOGI(TAG, "Starting Lua script");
-	file.close();
-	lua_pushstring(L, "Hello World");
-	lua_setglobal(L, "VAR");
-	// run the lua script
-	int status = luaL_dostring(L, luaScript.c_str());
-	// get the return value and print it
-	const char *result = lua_tostring(L, -1);
-	lua_pop(L, 1);
-	int timeTaken = millis() - start;
-	// print the lua result and time taken
-	ESP_LOGI(TAG, "Lua script ran in %dms and returned: %s", timeTaken, result);
+	vTaskDelete(NULL);
 }

@@ -5,7 +5,7 @@ SettingsManager::SettingsManager() {}
 
 static const char *TAG = "SettingsManager";
 
-void SettingsManager::init(JsonDocument *settings, JsonDocument *flows)
+void SettingsManager::init(JsonDocument *settings)
 {
 	ESP_LOGI(TAG, "Initializing Settings");
 	EEPROM.begin(512);
@@ -24,7 +24,6 @@ void SettingsManager::init(JsonDocument *settings, JsonDocument *flows)
 	}
 	(*settings)["firmwareVersion"] = firmwareVersion;
 	(*settings)["hardwareVersion"] = hardwareVersion;
-	deserializeJson(*flows, "{\"flows\":[],\"variables\":[]}");
 	xTaskCreate(
 		SettingsManager::loop, /* Task function. */
 		"SettingsManager",	   /* String with name of task. */
@@ -38,7 +37,6 @@ void SettingsManager::loop(void *parameter)
 {
 	while (true)
 	{
-		
-		vTaskDelay(5 / portTICK_PERIOD_MS);
+		delay(1000);
 	}
 }

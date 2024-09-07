@@ -26,10 +26,10 @@ static void load_custom_libs(lua_State *L)
 }
 
 // Initialize the Lua manager
-void LuaManager::init(JsonDocument *settings)
+void LuaManager::init(std::vector<flowData> *flowList)
 {
 	ESP_LOGI(TAG, "Initializing Lua");
-	LuaParams *params = new LuaParams{*settings, this};
+	LuaParams *params = new LuaParams{*flowList, this};
 	xTaskCreate(
 		LuaManager::loop, /* Task function. */
 		"LuaManager",	  /* String with name of task. */
@@ -42,7 +42,7 @@ void LuaManager::init(JsonDocument *settings)
 void LuaManager::loop(void *parameter)
 {
 	LuaParams *params = static_cast<LuaParams *>(parameter);
-	JsonDocument *settings = &params->settings;
+	std::vector<flowData> *flowList = &params->flowList;
 
 	luaL_openlibs(L);
 	load_custom_libs(L);

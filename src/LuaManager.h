@@ -7,6 +7,8 @@
 #include <LittleFS.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
+#include <unordered_map>
+#include "settingsManager.h"
 
 extern "C"
 {
@@ -31,14 +33,14 @@ public:
 	LuaManager(LuaManager const &) = delete;
 	void operator=(LuaManager const &) = delete;
 
-	void init(JsonDocument *settings);
+	void init(std::vector<flowData> *flowList);
 
 private:
 	static void loop(void *parameter);
 
 	struct LuaParams
 	{
-		JsonDocument &settings;
+		std::vector<flowData> &flowList;
 		LuaManager *instance; // Add instance pointer for accessing non-static members
 	};
 	static TaskHandle_t taskHandle;

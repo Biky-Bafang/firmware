@@ -38,7 +38,6 @@ void SDCardManager::loop(void *parameter)
 	while (true)
 	{
 		// Now you can access instance variables using `instance->`
-
 		if (digitalRead(CD) == HIGH && ((*settings)["sdCardStatus"] == 0 || (*settings)["sdCardStatus"] == 2))
 		{
 			(*settings)["sdCardStatus"] = 1;

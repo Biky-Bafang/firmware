@@ -39,8 +39,7 @@ SerialManager serialManager;
 LuaManager luaManager;
 
 JsonDocument settings;
-JsonDocument flows;
-std::unordered_map<std::string, int> variables;
+std::vector<flowData> flowList;
 
 static const char *TAG = "Main";
 
@@ -97,13 +96,13 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 				deserializeJson(tempDoc, "{\"id\":\"Core-0\",\"icon\":\"faBluetoothB\",\"label\":\"Start\",\"nodes\":5,\"triggers\":1}");
 				responseDoc["core"].add(tempDoc);
 				// put the variables to the responseDoc like [{"id": "value"}] without all the labels and such just that json
-				for (auto const &[key, val] : variables)
-				{
-					JsonDocument tempDoc;
-					tempDoc["id"] = key;
-					tempDoc["value"] = val;
-					responseDoc["variables"].add(tempDoc);
-				}
+				// for (auto const &[key, val] : variables)
+				// {
+				// 	JsonDocument tempDoc;
+				// 	tempDoc["id"] = key;
+				// 	tempDoc["value"] = val;
+				// 	responseDoc["variables"].add(tempDoc);
+				// }
 				serializeJsonPretty(responseDoc, Serial);
 				bleManager.sendData(responseDoc);
 				return;
@@ -233,7 +232,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 				value.erase(0, 1);
 				if (value.empty())
 					return;
-				variables[value] = 0;
+				// variables[value] = 0;
 				// save the variables to littlefs
 				File file = LittleFS.open("/variables.bin", "w");
 				if (!file)
@@ -241,21 +240,21 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 					ESP_LOGE(TAG, "Failed to open file for writing");
 					return;
 				}
-				for (const auto &[key, val] : variables)
-				{
-					uint16_t keyLength = key.length();
-					file.write((uint8_t *)&keyLength, sizeof(keyLength)); // Write length of the key
-					file.write((uint8_t *)key.c_str(), keyLength);		  // Write key data
-					file.write((uint8_t *)&val, sizeof(val));			  // Write value
-					file.write(0x00);									  // Null byte as delimiter
-				}
+				// for (const auto &[key, val] : variables)
+				// {
+				// 	uint16_t keyLength = key.length();
+				// 	file.write((uint8_t *)&keyLength, sizeof(keyLength)); // Write length of the key
+				// 	file.write((uint8_t *)key.c_str(), keyLength);		  // Write key data
+				// 	file.write((uint8_t *)&val, sizeof(val));			  // Write value
+				// 	file.write(0x00);									  // Null byte as delimiter
+				// }
 				file.close();
 			}
 
 			if (value[0] == 0x02) // Remove an variable
 			{
 				value.erase(0, 1);
-				variables.erase(value);
+				// variables.erase(value);
 				// save the variables to littlefs
 				File file = LittleFS.open("/variables.bin", "w");
 				if (!file)
@@ -263,11 +262,11 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 					ESP_LOGE(TAG, "Failed to open file for writing");
 					return;
 				}
-				for (auto const &[key, val] : variables)
-				{
-					file.write((uint8_t *)key.c_str(), key.length());
-					file.write((uint8_t *)&val, sizeof(val) + 1);
-				}
+				// for (auto const &[key, val] : variables)
+				// {
+				// 	file.write((uint8_t *)key.c_str(), key.length());
+				// 	file.write((uint8_t *)&val, sizeof(val) + 1);
+				// }
 				file.close();
 			}
 
@@ -304,59 +303,18 @@ void setup()
 {
 	maxHeapSize = ESP.getFreeHeap();
 	Serial.begin(115200);
-	delay(1000);
 	ESP_LOGI(TAG, "Starting...");
 	if (!LittleFS.begin())
 	{
 		ESP_LOGE(TAG, "Failed to mount file system");
 		return;
 	}
-	// get the variables from the file
-	File file = LittleFS.open("/variables.bin", "r");
-	if (!file)
-	{
-		ESP_LOGE(TAG, "Failed to open file for reading");
-		return;
-	}
-	while (file.available())
-	{
-		uint16_t keyLength;
-		if (file.read((uint8_t *)&keyLength, sizeof(keyLength)) != sizeof(keyLength))
-		{
-			ESP_LOGE(TAG, "Failed to read key length");
-			break;
-		}
 
-		String key;
-		key.reserve(keyLength);
-		for (uint16_t i = 0; i < keyLength; i++)
-		{
-			char c = file.read();
-			key += c;
-		}
-
-		int value;
-		if (file.read((uint8_t *)&value, sizeof(value)) != sizeof(value))
-		{
-			ESP_LOGE(TAG, "Failed to read value");
-			break;
-		}
-
-		variables[key.c_str()] = value;
-
-		// Optional: Skip over delimiter if you used one
-		if (file.read() != 0x00)
-		{
-			ESP_LOGE(TAG, "Failed to read delimiter or delimiter mismatch");
-			break;
-		}
-	}
-
-	settingsManager.init(&settings, &flows);
+	settingsManager.init(&settings);
 	serializeJsonPretty(settings, Serial);
-	sdCardManager.init(&settings);
+	// sdCardManager.init(&settings); SD card not working on rev 0.2 :(
 	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
-	luaManager.init(&settings);
+	luaManager.init(&flowList);
 	bleManager.init(settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settings["txPower"]));
 	wifiManager.init(&settings);
 }

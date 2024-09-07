@@ -9,6 +9,21 @@
 
 #define firmwareVersion "1.0.0"
 #define hardwareVersion "1.0.0"
+struct Variable
+{
+	std::string name;
+	std::string type;  // Example: "integer", "string", "boolean"
+	std::string value; // Current value of the variable (stored as a string for simplicity)
+	bool persist;	   // Whether the variable should be persisted across reboots
+};
+
+struct flowData
+{
+	std::string id;						   // ID
+	std::vector<uint8_t> hex_trigger_code; // Hex trigger code (e.g., 0x11, 0x52)
+	std::string lua_code;				   // Lua code as a string
+	std::vector<Variable> variables;	   // Variables needed for the Lua code, including value and persistence
+};
 
 class SettingsManager // Class declaration
 {
@@ -30,7 +45,7 @@ public:
 	SettingsManager(SettingsManager const &) = delete;
 	void operator=(SettingsManager const &) = delete;
 
-	void init(JsonDocument *settings, JsonDocument *flows);
+	void init(JsonDocument *settings);
 	JsonDocument settings;
 	JsonDocument &getSettings() { return settings; }
 

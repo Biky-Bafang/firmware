@@ -10,7 +10,8 @@ static int lmillis(lua_State *L)
 	lua_pushinteger(L, millis());
 	return 1;
 }
-static int lmicros(lua_State *L) {
+static int lmicros(lua_State *L)
+{
 	lua_pushinteger(L, micros());
 	return 1;
 }
@@ -53,21 +54,18 @@ static int llogv(lua_State *L)
 	return 0;
 }
 
-
-
 static const struct luaL_Reg lesp_funcs[] = {
-    { "millis", lmillis },
-	{ "micros", lmicros },
-	{ "logi", llogi },
-	{ "loge", lloge },
-	{ "logw", llogw },
-	{ "logd", llogd },
-	{ "logv", llogv },
-    { NULL, NULL }
-};
+	{"millis", lmillis},
+	{"micros", lmicros},
+	{"logi", llogi},
+	{"loge", lloge},
+	{"logw", llogw},
+	{"logd", llogd},
+	{"logv", llogv},
+	{NULL, NULL}};
 
 int luaopen_lesp(lua_State *L)
 {
-    luaL_newlib(L, lesp_funcs);
-    return 1;
+	luaL_newlib(L, lesp_funcs);
+	return 1;
 }

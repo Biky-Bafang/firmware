@@ -9,6 +9,7 @@
 #include <ArduinoJson.h>
 #include <unordered_map>
 #include "settingsManager.h"
+#define LUA_MAX_MEMSIZE 0x10000 // 64k
 
 extern "C"
 {
@@ -34,6 +35,8 @@ public:
 	void operator=(LuaManager const &) = delete;
 
 	void init(std::vector<flowData> *flowList);
+	// make an run function with the flowData as parameter and it should return the new variables
+	Variable run(flowData flow);
 
 private:
 	static void loop(void *parameter);

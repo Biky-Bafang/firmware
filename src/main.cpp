@@ -14,6 +14,7 @@
 #include <SD_MMC.h>
 #include "esp_log.h"
 #include <unordered_map>
+#include <Adafruit_NeoPixel.h>
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -37,6 +38,7 @@ WifiManager wifiManager;
 SettingsManager settingsManager;
 SerialManager serialManager;
 LuaManager luaManager;
+#define NEOPIXEL_PIN 48
 
 JsonDocument settings;
 std::vector<flowData> flowList;
@@ -297,12 +299,18 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 		// Handle read request
 	}
 };
-
 int maxHeapSize = 0;
 void setup()
 {
+	// set neopixel to green at 128 brightness
+	Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+	neopixel.begin();
+	neopixel.setPixelColor(0, neopixel.Color(0, 128, 128));
+	neopixel.setBrightness(128);
+	neopixel.show();
 	maxHeapSize = ESP.getFreeHeap();
 	Serial.begin(115200);
+	delay(1000);
 	ESP_LOGI(TAG, "Starting...");
 	if (!LittleFS.begin())
 	{
@@ -310,13 +318,55 @@ void setup()
 		return;
 	}
 
-	settingsManager.init(&settings);
+	settingsManager.init(&settings, &flowList);
 	serializeJsonPretty(settings, Serial);
 	// sdCardManager.init(&settings); SD card not working on rev 0.2 :(
-	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
-	luaManager.init(&flowList);
+	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"], &luaManager);
 	bleManager.init(settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settings["txPower"]));
 	wifiManager.init(&settings);
+	luaManager.init(&flowList);
+
+	flowData flow;
+	flow.name = "Core-0";
+	flow.id = "0";
+	flow.trigger_type = "CODE";
+	flow.trigger_data = "0x11, 0x52";
+	flow.trigger_device = "MOTOR";
+	flow.lua_code = "esp.logi('LuaExample','Sending 0x52, 0x01 for ok!')\nserial.write('motor', string.char(0x52, 0X01))\n";
+	Variable var;
+	var.name = "value";
+	var.type = "string";
+	var.value = "0x52, 0x01";
+	var.persist = false;
+	flow.variables.push_back(var);
+	File file2 = LittleFS.open("/flows/0.bin", "r");
+
+	// Open file for reading
+	file2 = LittleFS.open("/flows/0.bin", "r");
+	if (!file2)
+	{
+		ESP_LOGE(TAG, "Failed to open file for reading");
+		return;
+	}
+
+	// Read flowData from file
+	flowData tempFlow;
+	if (!settingsManager.readFlowDataFromBinary(file2, tempFlow))
+	{
+		ESP_LOGE(TAG, "Failed to read flow data from binary");
+		file2.close(); // Ensure the file is closed even if reading fails
+		return;
+	}
+	file2.close(); // Close the file after reading
+
+	// Add the read flowData to flowList
+	flowList.push_back(tempFlow);
+
+	// Print out the flowList
+	for (const auto &flow : flowList)
+	{
+		ESP_LOGI(TAG, "Flow: %s", flow.name.c_str());
+	}
 }
 void loop()
 {

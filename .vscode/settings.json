@@ -62,6 +62,10 @@
 	"rtoslib.h": "c",
 	"stdio.h": "c",
 	"iostream": "cpp",
-	"filesystem": "cpp"
+	"filesystem": "cpp",
+	"bitset": "cpp",
+	"regex": "cpp",
+	"arduino.h": "c",
+	"hardwareserial.h": "c"
 }
 }

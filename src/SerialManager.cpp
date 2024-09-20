@@ -1,5 +1,6 @@
 #include "SerialManager.h"
 #include "BLEManager.h"
+#include "SettingsManager.h"
 
 // Constructor
 SerialManager::SerialManager() : wifiStatus(0) {}
@@ -10,24 +11,31 @@ TaskHandle_t SerialManager::taskHandle1 = NULL;
 TaskHandle_t SerialManager::taskHandle2 = NULL;
 
 // Initialize the SD card
-void SerialManager::init(bool invert1, bool invert2, int packetDelay)
+void SerialManager::init(bool invert1, bool invert2, int packetDelay, LuaManager *luaManager)
 {
 	packetDelayVar = packetDelay;
 	ESP_LOGI(TAG, "Initializing Serial");
-	Serial1.begin(1200, SERIAL_8N1, cRX1, cTX1, invert1);
-	Serial2.begin(1200, SERIAL_8N1, cRX2, cTX2, invert2);
+	if (!invert1)
+		Serial1.begin(1200, SERIAL_8N1, cRX1, cTX1);
+	else
+		Serial1.begin(1200, SERIAL_8N1, cTX1, cRX1);
+	if (!invert2)
+		Serial2.begin(1200, SERIAL_8N1, cRX2, cTX2);
+	else
+		Serial2.begin(1200, SERIAL_8N1, cTX2, cRX2);
+	SerialParams *params = new SerialParams{luaManager, this};
 	xTaskCreate(
 		SerialManager::serial1ToSerial2, /* Task function. */
 		"serial1ToSerial2",				 /* String with name of task. */
 		10000,							 /* Stack size in bytes. */
-		this,							 /* Parameter passed as input of the task */
+		params,							 /* Parameter passed as input of the task */
 		2,								 /* Priority of the task. */
 		&taskHandle1);					 /* Task handle. */
 	xTaskCreate(
 		SerialManager::serial2ToSerial1, /* Task function. */
 		"serial2ToSerial1",				 /* String with name of task. */
 		10000,							 /* Stack size in bytes. */
-		this,							 /* Parameter passed as input of the task */
+		params,							 /* Parameter passed as input of the task */
 		2,								 /* Priority of the task. */
 		&taskHandle2);					 /* Task handle. */
 }
@@ -37,12 +45,15 @@ void SerialManager::restart(bool invert1, bool invert2, int packetDelay)
 	vTaskDelete(taskHandle2);
 	taskHandle1 = NULL;
 	taskHandle2 = NULL;
-	init(invert1, invert2, packetDelay);
+	init(invert1, invert2, packetDelay, NULL);
 }
 
 void SerialManager::serial1ToSerial2(void *parameter)
 {
-	SerialManager *instance = static_cast<SerialManager *>(parameter);
+	SerialParams *params = static_cast<SerialParams *>(parameter);
+	SerialManager *instance = params->instance;
+	LuaManager *luaManager = params->luaManager;
+
 	uint8_t buffer[100];
 	size_t bufferIndex = 0;
 	bool usedPattern = false;
@@ -69,7 +80,11 @@ void SerialManager::serial1ToSerial2(void *parameter)
 			String bufferString;
 			for (int i = 0; i < bufferIndex; i++)
 			{
-				String tempString = " 0x";
+				String tempString;
+				if (i == 0)
+					tempString = "0x";
+				else
+					tempString = ", 0x";
 				if (buffer[i] < 0x10)
 					tempString += "0";
 				tempString += String(buffer[i], HEX);
@@ -81,7 +96,7 @@ void SerialManager::serial1ToSerial2(void *parameter)
 			serializeJson(tempDoc, tempvalue);
 			// TODO send to ble
 			ESP_LOGI(TAG, "Serial1: %s", tempvalue.c_str());
-
+			// luaManager->run(flow);
 			BLEManager &manager = BLEManager::getInstance();
 			manager.sendData(tempDoc, false);
 			bufferIndex = 0;
@@ -92,7 +107,10 @@ void SerialManager::serial1ToSerial2(void *parameter)
 }
 void SerialManager::serial2ToSerial1(void *parameter)
 {
-	SerialManager *instance = static_cast<SerialManager *>(parameter);
+	SerialParams *params = static_cast<SerialParams *>(parameter);
+	SerialManager *instance = params->instance;
+	LuaManager *luaManager = params->luaManager;
+
 	uint8_t buffer[100];
 	size_t bufferIndex = 0;
 	bool usedPattern = false;

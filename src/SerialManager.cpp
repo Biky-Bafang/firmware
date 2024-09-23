@@ -1,6 +1,5 @@
 #include "SerialManager.h"
 #include "BLEManager.h"
-#include "SettingsManager.h"
 
 // Constructor
 SerialManager::SerialManager() : wifiStatus(0) {}
@@ -11,7 +10,7 @@ TaskHandle_t SerialManager::taskHandle1 = NULL;
 TaskHandle_t SerialManager::taskHandle2 = NULL;
 
 // Initialize the SD card
-void SerialManager::init(bool invert1, bool invert2, int packetDelay, LuaManager *luaManager)
+void SerialManager::init(bool invert1, bool invert2, int packetDelay, LuaManager *luaManager, std::vector<flowData> *flowList)
 {
 	packetDelayVar = packetDelay;
 	ESP_LOGI(TAG, "Initializing Serial");
@@ -23,21 +22,21 @@ void SerialManager::init(bool invert1, bool invert2, int packetDelay, LuaManager
 		Serial2.begin(1200, SERIAL_8N1, cRX2, cTX2);
 	else
 		Serial2.begin(1200, SERIAL_8N1, cTX2, cRX2);
-	SerialParams *params = new SerialParams{luaManager, this};
+	SerialParams *params = new SerialParams{luaManager, flowList, this};
 	xTaskCreate(
-		SerialManager::serial1ToSerial2, /* Task function. */
-		"serial1ToSerial2",				 /* String with name of task. */
-		10000,							 /* Stack size in bytes. */
-		params,							 /* Parameter passed as input of the task */
-		2,								 /* Priority of the task. */
-		&taskHandle1);					 /* Task handle. */
+		SerialManager::serial1Task, /* Task function. */
+		"serial1Task",				/* String with name of task. */
+		10000,						/* Stack size in bytes. */
+		params,						/* Parameter passed as input of the task */
+		2,							/* Priority of the task. */
+		&taskHandle1);				/* Task handle. */
 	xTaskCreate(
-		SerialManager::serial2ToSerial1, /* Task function. */
-		"serial2ToSerial1",				 /* String with name of task. */
-		10000,							 /* Stack size in bytes. */
-		params,							 /* Parameter passed as input of the task */
-		2,								 /* Priority of the task. */
-		&taskHandle2);					 /* Task handle. */
+		SerialManager::serial2Task, /* Task function. */
+		"serial2Task",				/* String with name of task. */
+		10000,						/* Stack size in bytes. */
+		params,						/* Parameter passed as input of the task */
+		2,							/* Priority of the task. */
+		&taskHandle2);				/* Task handle. */
 }
 void SerialManager::restart(bool invert1, bool invert2, int packetDelay)
 {
@@ -45,18 +44,18 @@ void SerialManager::restart(bool invert1, bool invert2, int packetDelay)
 	vTaskDelete(taskHandle2);
 	taskHandle1 = NULL;
 	taskHandle2 = NULL;
-	init(invert1, invert2, packetDelay, NULL);
+	init(invert1, invert2, packetDelay, NULL, NULL);
 }
 
-void SerialManager::serial1ToSerial2(void *parameter)
+void SerialManager::serial1Task(void *parameter)
 {
 	SerialParams *params = static_cast<SerialParams *>(parameter);
-	SerialManager *instance = params->instance;
 	LuaManager *luaManager = params->luaManager;
+	std::vector<flowData> *flowList = params->flowList;
+	SerialManager *instance = params->instance;
 
 	uint8_t buffer[100];
 	size_t bufferIndex = 0;
-	bool usedPattern = false;
 	unsigned long lastBuffer = millis();
 	while (1)
 	{
@@ -96,6 +95,15 @@ void SerialManager::serial1ToSerial2(void *parameter)
 			serializeJson(tempDoc, tempvalue);
 			// TODO send to ble
 			ESP_LOGI(TAG, "Serial1: %s", tempvalue.c_str());
+			// check if flowList has trigger_data as tempvalue
+			for (auto const &flow : *flowList)
+			{
+				if (flow.trigger_data == tempDoc["value"])
+				{
+					ESP_LOGI(TAG, "Found flow");
+					luaManager->run(flow);
+				}
+			}
 			// luaManager->run(flow);
 			BLEManager &manager = BLEManager::getInstance();
 			manager.sendData(tempDoc, false);
@@ -105,7 +113,7 @@ void SerialManager::serial1ToSerial2(void *parameter)
 		vTaskDelay(5); // Yield to other tasks
 	}
 }
-void SerialManager::serial2ToSerial1(void *parameter)
+void SerialManager::serial2Task(void *parameter)
 {
 	SerialParams *params = static_cast<SerialParams *>(parameter);
 	SerialManager *instance = params->instance;

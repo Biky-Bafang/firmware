@@ -1,20 +1,25 @@
 #include <Arduino.h>
-#include "BLEManager.h"
-#include "SDCardManager.h"
-#include "WifiManager.h"
-#include <LittleFS.h>
-#include "SettingsManager.h"
-#include "SerialManager.h"
-#include "LuaManager.h"
-#include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
 #include <ArduinoOTA.h>
-#include <WiFi.h>
-#include <SD_MMC.h>
-#include "esp_log.h"
 #include <unordered_map>
-#include <Adafruit_NeoPixel.h>
+
+#include <LittleFS.h>
+#include <EEPROM.h>
+
+#include <WiFi.h>
+#include "esp_log.h"
+
+#include "BLEManager.h"
+#include "SDCardManager.h"
+#include "WifiManager.h"
+#include "SettingsManager.h"
+#include "SerialManager.h"
+#include "LuaManager.h"
+#include "LEDManager.h"
+
+#include <driver/adc.h>
+#include "esp_adc_cal.h"
 
 #include <stdio.h>
 #include <inttypes.h>
@@ -38,7 +43,12 @@ WifiManager wifiManager;
 SettingsManager settingsManager;
 SerialManager serialManager;
 LuaManager luaManager;
-#define NEOPIXEL_PIN 48
+LEDManager ledManager;
+
+#define NO_OF_SAMPLES 64
+#define DEFAULT_VREF 1100 // Default reference voltage in mV (can be calibrated)
+#define ADC_WIDTH ADC_WIDTH_BIT_12
+#define VOLTAGE_DIVIDER 48.96
 
 JsonDocument settings;
 std::vector<flowData> flowList;
@@ -302,16 +312,12 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 int maxHeapSize = 0;
 void setup()
 {
-	// set neopixel to green at 128 brightness
-	Adafruit_NeoPixel neopixel(1, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
-	neopixel.begin();
-	neopixel.setPixelColor(0, neopixel.Color(0, 128, 128));
-	neopixel.setBrightness(128);
-	neopixel.show();
 	maxHeapSize = ESP.getFreeHeap();
 	Serial.begin(115200);
-	delay(1000);
 	ESP_LOGI(TAG, "Starting...");
+	ledManager.init();
+	ledManager.setLED(255, 255, 0, 32);
+	// set neopixel to green at 128 brightness
 	if (!LittleFS.begin())
 	{
 		ESP_LOGE(TAG, "Failed to mount file system");
@@ -321,7 +327,7 @@ void setup()
 	settingsManager.init(&settings, &flowList);
 	serializeJsonPretty(settings, Serial);
 	// sdCardManager.init(&settings); SD card not working on rev 0.2 :(
-	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"], &luaManager);
+	serialManager.init(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"], &luaManager, &flowList);
 	bleManager.init(settings["name"], new MyCharacteristicCallbacks(), bleManager.powerLevel(settings["txPower"]));
 	wifiManager.init(&settings);
 	luaManager.init(&flowList);
@@ -332,16 +338,20 @@ void setup()
 	flow.trigger_type = "CODE";
 	flow.trigger_data = "0x11, 0x52";
 	flow.trigger_device = "MOTOR";
-	flow.lua_code = "esp.logi('LuaExample','Sending 0x52, 0x01 for ok!')\nserial.write('motor', string.char(0x52, 0X01))\n";
+	flow.lua_code = "esp.logi('LuaExample','Sending 0x52, 0x01 for ok!')\nserial.write('motor', string.char(0x52,0x18,0x1F,0x0F,0x00,0x1C,0x25,0x2E,0x37,0x40,0x49,0x52,0x5B,0x64,0x64,0x64,0x64,0x64,0x64,0x64,0x64,0x64,0x64,0x64,0x34,0x01,0xDF))\n";
 	Variable var;
 	var.name = "value";
 	var.type = "string";
 	var.value = "0x52, 0x01";
 	var.persist = false;
 	flow.variables.push_back(var);
-	File file2 = LittleFS.open("/flows/0.bin", "r");
+	File file2 = LittleFS.open("/flows/0.bin", "w");
 
-	// Open file for reading
+	// writee file2
+	settingsManager.dumpFlowDataToBinary(file2, flow);
+	file2.close();
+
+	// read file2 as string
 	file2 = LittleFS.open("/flows/0.bin", "r");
 	if (!file2)
 	{
@@ -367,8 +377,34 @@ void setup()
 	{
 		ESP_LOGI(TAG, "Flow: %s", flow.name.c_str());
 	}
+	ledManager.setLED(255, 255, 255, 32);
+	delay(8000);
+	ledManager.setLED(255, 255, 255, 3);
+}
+// make an array where I put the voltage values in and then average them out
+uint32_t adc_read_voltage(adc2_channel_t channel)
+{
+	esp_adc_cal_characteristics_t adc2_chars;
+	esp_adc_cal_characterize(ADC_UNIT_2, ADC_ATTEN_DB_12, ADC_WIDTH, DEFAULT_VREF, &adc2_chars);
+	uint32_t voltage = 0;
+	adc2_config_channel_atten(channel, ADC_ATTEN_DB_12);
+	uint32_t adc_reading = 0;
+	for (int i = 0; i < NO_OF_SAMPLES; i++)
+	{
+		int raw = 0;
+		adc2_get_raw(channel, ADC_WIDTH_BIT_12, &raw);
+		adc_reading += raw;
+	}
+	adc_reading /= NO_OF_SAMPLES;
+	voltage = esp_adc_cal_raw_to_voltage(adc_reading, &adc2_chars);
+	return voltage;
 }
 void loop()
 {
-	vTaskDelete(NULL);
+	uint32_t voltage = adc_read_voltage(ADC2_CHANNEL_7);
+	ESP_LOGI(TAG, "Voltage: %f", voltage / VOLTAGE_DIVIDER);
+	settings["inputVoltage"] = voltage / VOLTAGE_DIVIDER;
+
+	// setLed to random values
+	delay(5000);
 }

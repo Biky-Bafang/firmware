@@ -69,13 +69,6 @@ void SettingsManager::writeString(fs::File &file, const std::string &str)
 
 bool SettingsManager::dumpFlowDataToBinary(fs::File &file, const flowData &flow)
 {
-	// write the flowVersion at the beginning of the file
-	uint8_t version = flowVersion;
-	if (file.write((uint8_t *)&version, sizeof(version)) != sizeof(version))
-	{
-		ESP_LOGE(TAG, "Failed to write flow version");
-		return false;
-	}
 	writeString(file, flow.name);
 	writeString(file, flow.id);
 	writeString(file, flow.trigger_type);
@@ -109,22 +102,12 @@ bool SettingsManager::dumpFlowDataToBinary(fs::File &file, const flowData &flow)
 	{
 		ESP_LOGE(TAG, "Failed to write coreFlow");
 	}
+	ESP_LOGI(TAG, "Flow data written to file");
 	return true;
 }
 
 bool SettingsManager::readFlowDataFromBinary(fs::File &file, flowData &flow)
 {
-	uint8_t version;
-	if (file.read((uint8_t *)&version, sizeof(version)) != sizeof(version))
-	{
-		ESP_LOGE(TAG, "Failed to read flow version");
-		return false;
-	}
-	if (version != flowVersion)
-	{
-		ESP_LOGE(TAG, "Invalid flow version");
-		return false;
-	}
 
 	flow.name = readString(file);
 	ESP_LOGI(TAG, "Name: %s", flow.name.c_str());

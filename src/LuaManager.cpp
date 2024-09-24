@@ -91,17 +91,6 @@ void LuaManager::loop(void *parameter)
 	load_custom_libs(L);
 	while (true)
 	{
-		// send 0x11 as an char array to motor
-		int r = luaL_dostring(L, "esp.logi('LuaExample','Sending hello world!')\nserial.write('motor', string.char(0x68, 0X65, 0X6C, 0X6C, 0X6F, 0X20, 0X77, 0X6F, 0X72, 0X6C, 0X64))\n");
-		if (r)
-		{
-			report(L, r);
-			while (1)
-			{
-				vTaskDelay(1000);
-			}
-		}
-		r = lua_pcall(L, 0, 0, 0);
 		delay(1000);
 	}
 	lua_close(L);
@@ -132,6 +121,7 @@ Variable LuaManager::run(flowData flow)
 		report(L, r);
 		return var;
 	}
+	lua_pop(L, 1);
 	r = lua_pcall(L, 0, 0, 0);
 	return var;
 }

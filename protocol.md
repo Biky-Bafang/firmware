@@ -282,13 +282,25 @@ Thanks for philippsandhaus for providing some protocol information. [link](https
 ### Send (Description)
 
 - 00: 0x11 (Read)
-- 01: 0x22 (Speed)
+- 01: 0x20 (Speed)
 
 ### Response (Description)
 
-- 00: 0x00 (?)
-- 01: 0x00 (Wheel?)
-- 02: 0x20 (Wheel + 0x20?)
+- 00: 0x00 (Range Extension) - Used to extend RPM readings beyond 255 RPM. It acts as a multiplier for the RPM value.
+- 01: 0x00 (RPM Raw Wheel) - Represents the current RPM of the wheel.
+- 02: 0x20 (RPM Raw Wheel + 0x20)
+
+$$
+\text{RPM} = \text{RPM}_{\text{raw}} + (256 \times \text{byte 00})
+$$
+
+$$
+\text{KM/h} = \text{RPM} \times \left( \frac{\pi \times INCH \times 0.0254 \times 60}{1000} \right)
+$$
+
+$$
+\text{MPH} = \text{RPM} \times \left( \frac{\pi \times INCH \times 0.0254 \times 60}{1000} \right) \times 0.621371
+$$
 
 ## Command: Read Brakes
 

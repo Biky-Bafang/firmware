@@ -11,7 +11,7 @@ void SettingsManager::init(JsonDocument *settings, std::vector<flowData> *flowLi
 	EEPROM.begin(512);
 	EepromStream eepromStream(0, 512);
 	DeserializationError error = deserializeJson(*settings, eepromStream);
-	if (error || (*settings).size() < 7)
+	if (error || (*settings).size() < 8)
 	{
 		// check if (*settings)["name"] exists and is not empty
 		(*settings)["name"] = (*settings)["name"] | "Biky";
@@ -21,6 +21,7 @@ void SettingsManager::init(JsonDocument *settings, std::vector<flowData> *flowLi
 		(*settings)["txPower"] = (*settings)["txPower"] | 9;
 		(*settings)["invertSerial1"] = (*settings)["invertSerial1"] | false;
 		(*settings)["invertSerial2"] = (*settings)["invertSerial2"] | false;
+		(*settings)["powerLock"] = (*settings)["powerLock"] | false;
 	}
 	(*settings)["firmwareVersion"] = firmwareVersion;
 	(*settings)["hardwareVersion"] = hardwareVersion;

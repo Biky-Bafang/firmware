@@ -1,0 +1,1 @@
+serial.write("motor", string.char(0x0a, 0x05))

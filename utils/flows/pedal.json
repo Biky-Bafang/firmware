@@ -1,0 +1,16 @@
+{
+  "name": "Test Flow",
+  "id": "2",
+  "trigger_type": "code",
+  "trigger_data": "0x11 0x53",
+  "trigger_device": "motor",
+  "variables": [
+    {
+      "name": "test",
+      "type": "string",
+      "value": "Hello World!",
+      "persist": false
+    }
+  ],
+  "coreFlow": 0
+}

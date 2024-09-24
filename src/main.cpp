@@ -158,6 +158,10 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 				settings["invertSerial2"] = value[1] == 0x01;
 				serialManager.restart(settings["invertSerial1"], settings["invertSerial2"], settings["packetDelay"]);
 			}
+			if (value[0] == 0x07)
+			{
+				settings["powerLock"] = value[1] == 0x01;
+			}
 			// save the settings to EEPROM
 			EepromStream eepromStream(0, 512);
 			serializeJson(settings, eepromStream);
@@ -312,6 +316,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 int maxHeapSize = 0;
 void setup()
 {
+	pinMode(21, OUTPUT);
 	maxHeapSize = ESP.getFreeHeap();
 	Serial.begin(115200);
 	ESP_LOGI(TAG, "Starting...");
@@ -351,26 +356,35 @@ void setup()
 	settingsManager.dumpFlowDataToBinary(file2, flow);
 	file2.close();
 
-	// read file2 as string
-	file2 = LittleFS.open("/flows/0.bin", "r");
-	if (!file2)
+	// go through all the files in the flows folder
+	File dir = LittleFS.open("/flows");
+	if (!dir)
 	{
-		ESP_LOGE(TAG, "Failed to open file for reading");
+		ESP_LOGE(TAG, "Failed to open directory");
 		return;
 	}
-
-	// Read flowData from file
-	flowData tempFlow;
-	if (!settingsManager.readFlowDataFromBinary(file2, tempFlow))
+	while (File file = dir.openNextFile())
 	{
-		ESP_LOGE(TAG, "Failed to read flow data from binary");
-		file2.close(); // Ensure the file is closed even if reading fails
-		return;
+		if (!file.isDirectory())
+		{
+			File flowFile = LittleFS.open("/flows/" + String(file.name()), "r");
+			if (!flowFile)
+			{
+				ESP_LOGE(TAG, "Failed to open file for reading");
+				return;
+			}
+			flowData tempFlow;
+			if (!settingsManager.readFlowDataFromBinary(flowFile, tempFlow))
+			{
+				ESP_LOGE(TAG, "Failed to read flow data from binary");
+				flowFile.close(); // Ensure the file is closed even if reading fails
+				return;
+			}
+			flowFile.close(); // Close the file after reading
+			flowList.push_back(tempFlow);
+		}
+		file.close();
 	}
-	file2.close(); // Close the file after reading
-
-	// Add the read flowData to flowList
-	flowList.push_back(tempFlow);
 
 	// Print out the flowList
 	for (const auto &flow : flowList)
@@ -402,9 +416,13 @@ uint32_t adc_read_voltage(adc2_channel_t channel)
 void loop()
 {
 	uint32_t voltage = adc_read_voltage(ADC2_CHANNEL_7);
-	ESP_LOGI(TAG, "Voltage: %f", voltage / VOLTAGE_DIVIDER);
 	settings["inputVoltage"] = voltage / VOLTAGE_DIVIDER;
+	// if settings["powerLock"] is true then set pin 21 to high
+	if (settings["powerLock"])
+		digitalWrite(21, HIGH);
+	else
+		digitalWrite(21, LOW);
 
 	// setLed to random values
-	delay(5000);
+	delay(1000);
 }

@@ -64,7 +64,6 @@ void SerialManager::serial1Task(void *parameter)
 			int c = Serial1.read();
 			if (c == -1)
 				continue;
-			Serial2.write(c);
 			buffer[strlen((char *)buffer)] = c;
 			lastBuffer = millis();
 			buffer[bufferIndex++] = (uint8_t)c;
@@ -75,7 +74,6 @@ void SerialManager::serial1Task(void *parameter)
 		}
 		if (millis() - lastBuffer > packetDelayVar && bufferIndex > 0)
 		{
-			JsonDocument tempDoc;
 			String bufferString;
 			for (int i = 0; i < bufferIndex; i++)
 			{
@@ -83,34 +81,25 @@ void SerialManager::serial1Task(void *parameter)
 				if (i == 0)
 					tempString = "0x";
 				else
-					tempString = ", 0x";
+					tempString = " 0x";
 				if (buffer[i] < 0x10)
 					tempString += "0";
 				tempString += String(buffer[i], HEX);
 				bufferString += tempString;
 			}
-			tempDoc["type"] = "serial1";
-			tempDoc["value"] = bufferString;
-			String tempvalue;
-			serializeJson(tempDoc, tempvalue);
-			// TODO send to ble
-			ESP_LOGI(TAG, "Serial1: %s", tempvalue.c_str());
-			// check if flowList has trigger_data as tempvalue
 			for (auto const &flow : *flowList)
 			{
-				if (flow.trigger_data == tempDoc["value"])
+				if (flow.trigger_data == bufferString.c_str() && flow.trigger_device == "motor")
 				{
-					ESP_LOGI(TAG, "Found flow");
 					luaManager->run(flow);
+					break;
 				}
 			}
-			// luaManager->run(flow);
-			BLEManager &manager = BLEManager::getInstance();
-			manager.sendData(tempDoc, false);
+			ESP_LOGI(TAG, "Serial1: %s", bufferString.c_str());
 			bufferIndex = 0;
 			memset(buffer, 0, sizeof(buffer));
 		}
-		vTaskDelay(5); // Yield to other tasks
+		vTaskDelay(3); // Yield to other tasks
 	}
 }
 void SerialManager::serial2Task(void *parameter)
@@ -121,7 +110,6 @@ void SerialManager::serial2Task(void *parameter)
 
 	uint8_t buffer[100];
 	size_t bufferIndex = 0;
-	bool usedPattern = false;
 	unsigned long lastBuffer = millis();
 
 	while (1)
@@ -131,7 +119,6 @@ void SerialManager::serial2Task(void *parameter)
 			int c = Serial2.read();
 			if (c == -1)
 				continue;
-			Serial1.write(c);
 			buffer[strlen((char *)buffer)] = c;
 			lastBuffer = millis();
 			buffer[bufferIndex++] = (uint8_t)c;
@@ -151,6 +138,15 @@ void SerialManager::serial2Task(void *parameter)
 					tempString += "0";
 				tempString += String(buffer[i], HEX);
 				bufferString += tempString;
+			}
+			for (auto const &flow : *params->flowList)
+			{
+				if (flow.trigger_data == bufferString.c_str() && flow.trigger_device == "display")
+				{
+					ESP_LOGI(TAG, "Found flow");
+					luaManager->run(flow);
+					break;
+				}
 			}
 			tempDoc["type"] = "serial2";
 			tempDoc["value"] = bufferString;
